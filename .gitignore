@@ -6,8 +6,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-uploads/
-/public/assets/uploads/
+# Ignora a pasta de uploads específica do backend
+server/src/assets/upload/
+
+# Mantém a regra anterior se ainda for necessária para o frontend
+# uploads/
+# /public/assets/uploads/
 
 .DS_Store
 Thumbs.db

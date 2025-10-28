@@ -24,6 +24,24 @@ CREATE TABLE IF NOT EXISTS playlists (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(100) NOT NULL,
   descricao TEXT,
-  imagem LONGTEXT,
-  tracks_ids JSON
+  imagem VARCHAR(255),
+  tracks_ids JSON,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS agendamentos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  data_agendamento DATE NOT NULL,
+  hora_inicio INT NOT NULL COMMENT 'Representa a hora do dia (0-23)',
+  playlist_id INT NULL,
+  regra_repeticao ENUM('NENHUMA', 'DIA_SEMANA_MES') NOT NULL DEFAULT 'NENHUMA',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_data_hora (data_agendamento, hora_inicio),
+  CONSTRAINT fk_playlist
+    FOREIGN KEY (playlist_id)
+    REFERENCES playlists(id)
+    ON DELETE SET NULL,
+  CONSTRAINT uq_data_hora UNIQUE (data_agendamento, hora_inicio)
 );

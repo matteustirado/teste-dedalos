@@ -1,10 +1,19 @@
 import express from 'express';
-import { createPlaylist, getAllPlaylists, deletePlaylist } from '../controllers/playlistController.js'; // Adicionar deletePlaylist
+import {
+  createPlaylist,
+  getAllPlaylists,
+  getPlaylistById, 
+  updatePlaylist,  
+  deletePlaylist,
+  uploadMiddleware 
+} from '../controllers/playlistController.js';
 
 const router = express.Router();
 
-router.post('/', createPlaylist);
+router.post('/', uploadMiddleware, createPlaylist);
 router.get('/', getAllPlaylists);
-router.delete('/:id', deletePlaylist); // Nova rota DELETE
+router.get('/:id', getPlaylistById); 
+router.put('/:id', uploadMiddleware, updatePlaylist); 
+router.delete('/:id', deletePlaylist);
 
 export default router;

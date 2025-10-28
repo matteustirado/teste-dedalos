@@ -219,14 +219,31 @@ export const addTrack = async (req, res) => {
   }
 }
 
+const safeJsonParse = (jsonString) => {
+  if (!jsonString) return [];
+  try {
+    const parsed = JSON.parse(jsonString);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+};
+
 export const listTracks = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM tracks ORDER BY created_at DESC')
-    res.json(rows)
+    const [rows] = await pool.query('SELECT * FROM tracks ORDER BY created_at DESC');
+    
+    const processedRows = rows.map(track => ({
+      ...track,
+      artistas_participantes: safeJsonParse(track.artistas_participantes),
+      dias_semana: safeJsonParse(track.dias_semana)
+    }));
+    
+    res.json(processedRows);
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: err.message });
   }
-}
+};
 
 export const updateTrack = async (req, res) => {
   const { id } = req.params
