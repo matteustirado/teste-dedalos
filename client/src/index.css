@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg-dark-secondary font-display text-text relative overflow-x-hidden;
+  }
+}
+
+.liquid-glass {
+  background: rgba(30, 30, 30, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bg-gradient-warm::before,
+.bg-gradient-warm::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  width: 65vmax;
+  height: 65vmax;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  filter: blur(130px);
+}
+
+.bg-gradient-warm::before {
+  top: 0;
+  left: 0;
+  transform: translate(-30%, -30%);
+  background-image: radial-gradient(
+    circle at top left,
+    rgba(255, 150, 0, 0.45) 0%,
+    rgba(255, 110, 0, 0.3) 20%,
+    rgba(255, 77, 0, 0.15) 40%,
+    rgba(255, 77, 0, 0.08) 60%,
+    transparent 80%
+  );
+  animation: glowTopLeft 10s ease-in-out infinite alternate;
+}
+
+.bg-gradient-warm::after {
+  bottom: 0;
+  right: 0;
+  transform: translate(30%, 30%);
+  background-image: radial-gradient(
+    circle at bottom right,
+    rgba(255, 140, 0, 0.4) 0%,
+    rgba(255, 90, 0, 0.25) 25%,
+    rgba(249, 115, 22, 0.12) 45%,
+    rgba(255, 77, 0, 0.06) 65%,
+    transparent 85%
+  );
+  animation: glowBottomRight 12s ease-in-out infinite alternate;
+}
+
+@keyframes glowTopLeft {
+  0% {
+    opacity: 0.45;
+    transform: translate(-30%, -30%) scale(1);
+    filter: blur(120px);
+  }
+  25% {
+    opacity: 0.55;
+    transform: translate(-32%, -32%) scale(1.03);
+    filter: blur(130px);
+  }
+  50% {
+    opacity: 0.75;
+    transform: translate(-34%, -34%) scale(1.08);
+    filter: blur(140px);
+  }
+  75% {
+    opacity: 0.55;
+    transform: translate(-32%, -32%) scale(1.03);
+    filter: blur(130px);
+  }
+  100% {
+    opacity: 0.45;
+    transform: translate(-30%, -30%) scale(1);
+    filter: blur(120px);
+  }
+}
+
+@keyframes glowBottomRight {
+  0% {
+    opacity: 0.4;
+    transform: translate(30%, 30%) scale(1);
+    filter: blur(120px);
+  }
+  25% {
+    opacity: 0.5;
+    transform: translate(32%, 32%) scale(1.04);
+    filter: blur(130px);
+  }
+  50% {
+    opacity: 0.65;
+    transform: translate(34%, 34%) scale(1.08);
+    filter: blur(140px);
+  }
+  75% {
+    opacity: 0.5;
+    transform: translate(32%, 32%) scale(1.04);
+    filter: blur(130px);
+  }
+  100% {
+    opacity: 0.4;
+    transform: translate(30%, 30%) scale(1);
+    filter: blur(120px);
+  }
+}
