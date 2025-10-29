@@ -1,5 +1,3 @@
-USE radio_dedalos;
-
 CREATE TABLE IF NOT EXISTS tracks (
   id INT AUTO_INCREMENT PRIMARY KEY,
   youtube_id VARCHAR(50) NOT NULL UNIQUE,

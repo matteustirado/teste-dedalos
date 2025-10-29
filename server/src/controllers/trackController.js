@@ -63,12 +63,18 @@ export const fetchYoutubeData = async (req, res) => {
     const snippet = item.snippet
     const durationInSeconds = parseISODuration(item.contentDetails.duration)
 
+    let thumbnailUrl = null;
+    if (snippet.thumbnails) {
+        thumbnailUrl = snippet.thumbnails.high?.url || snippet.thumbnails.medium?.url || snippet.thumbnails.default?.url || null;
+    }
+
     const videoData = {
       youtube_id: youtubeId,
       titulo: snippet.title,
       artista: snippet.channelTitle,
       duracao_segundos: durationInSeconds,
-      end_segundos: durationInSeconds
+      end_segundos: durationInSeconds,
+      thumbnail_url: thumbnailUrl
     }
 
     res.json(videoData)
@@ -168,6 +174,7 @@ export const addTrack = async (req, res) => {
     ano, 
     gravadora,
     diretor,
+    thumbnail_url,
     duracao_segundos,
     start_segundos,
     end_segundos,
@@ -199,6 +206,7 @@ export const addTrack = async (req, res) => {
       ano: processedAno, 
       gravadora,
       diretor,
+      thumbnail_url: thumbnail_url || null,
       duracao_segundos,
       start_segundos,
       end_segundos,
@@ -231,7 +239,7 @@ const safeJsonParse = (jsonString) => {
 
 export const listTracks = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM tracks ORDER BY created_at DESC');
+    const [rows] = await pool.query('SELECT * FROM tracks ORDER BY created_at DESC')
     
     const processedRows = rows.map(track => ({
       ...track,
@@ -255,6 +263,7 @@ export const updateTrack = async (req, res) => {
     ano, 
     gravadora,
     diretor,
+    thumbnail_url,
     start_segundos,
     end_segundos,
     is_commercial,
@@ -264,7 +273,7 @@ export const updateTrack = async (req, res) => {
   let processedAno = null; 
   if (ano !== '' && ano != null) {
      const anoInt = parseInt(ano, 10);
-   if (!isNaN(anoInt)) {
+    if (!isNaN(anoInt)) {
       processedAno = anoInt;
     }
   }
@@ -280,6 +289,7 @@ export const updateTrack = async (req, res) => {
       ano: processedAno, 
       gravadora,
       diretor,
+      thumbnail_url: thumbnail_url || null,
       start_segundos,
       end_segundos,
       is_commercial,
@@ -305,3 +315,42 @@ export const deleteTrack = async (req, res) => {
     res.status(500).json({ error: 'Erro ao deletar a música.' })
   }
 }
+
+export const deleteMultipleTracks = async (req, res) => {
+  const { ids } = req.body; 
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'Nenhum ID válido fornecido para exclusão.' });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    
+    const numericIds = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+
+    if (numericIds.length === 0) {
+         await connection.rollback();
+         return res.status(400).json({ error: 'IDs fornecidos são inválidos.' });
+    }
+
+    const placeholders = numericIds.map(() => '?').join(',');
+    
+    const [result] = await connection.query(
+         `DELETE FROM tracks WHERE id IN (${placeholders})`,
+         numericIds
+    );
+    
+    await connection.commit();
+    
+    console.log(`Excluídas ${result.affectedRows} faixas.`);
+    res.json({ message: `${result.affectedRows} mídias foram excluídas com sucesso!` });
+
+  } catch (err) {
+    await connection.rollback();
+    console.error('Erro ao excluir mídias em lote:', err);
+    res.status(500).json({ error: 'Erro interno ao excluir mídias.' });
+  } finally {
+    connection.release();
+  }
+};
