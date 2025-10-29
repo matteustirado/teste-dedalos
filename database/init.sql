@@ -1,3 +1,5 @@
+USE radio_dedalos;
+
 CREATE TABLE IF NOT EXISTS tracks (
   id INT AUTO_INCREMENT PRIMARY KEY,
   youtube_id VARCHAR(50) NOT NULL UNIQUE,
@@ -8,6 +10,7 @@ CREATE TABLE IF NOT EXISTS tracks (
   ano INT,
   gravadora VARCHAR(255),
   diretor VARCHAR(255),
+  thumbnail_url VARCHAR(512) NULL, 
   duracao_segundos INT NOT NULL,
   start_segundos INT NOT NULL DEFAULT 0,
   end_segundos INT,

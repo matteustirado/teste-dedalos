@@ -239,7 +239,7 @@ const safeJsonParse = (jsonString) => {
 
 export const listTracks = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM tracks ORDER BY created_at DESC')
+    const [rows] = await pool.query('SELECT * FROM tracks ORDER BY created_at DESC');
     
     const processedRows = rows.map(track => ({
       ...track,
@@ -273,7 +273,7 @@ export const updateTrack = async (req, res) => {
   let processedAno = null; 
   if (ano !== '' && ano != null) {
      const anoInt = parseInt(ano, 10);
-    if (!isNaN(anoInt)) {
+   if (!isNaN(anoInt)) {
       processedAno = anoInt;
     }
   }
@@ -337,8 +337,8 @@ export const deleteMultipleTracks = async (req, res) => {
     const placeholders = numericIds.map(() => '?').join(',');
     
     const [result] = await connection.query(
-         `DELETE FROM tracks WHERE id IN (${placeholders})`,
-         numericIds
+        `DELETE FROM tracks WHERE id IN (${placeholders})`,
+        numericIds
     );
     
     await connection.commit();

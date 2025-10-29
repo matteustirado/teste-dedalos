@@ -1,46 +1,5 @@
-MusicCollection
-trackController
-init.sql
+Reaplicar MC.3 (Backend): Atualizar o trackController.js para lidar com thumbnail_url.
 
+Reaplicar MC.7.1 (Backend): Adicionar a rota e a função de exclusão em lote.
 
-Objetivo: Permitir selecionar e excluir várias músicas de uma vez.
-
-Ações:
-
-No MusicCollection.jsx:
-
-Adicionar estado: const [selectedTrackIds, setSelectedTrackIds] = useState(new Set());.
-
-UI - Cabeçalho da Lista: Adicionar um checkbox "Selecionar Todos" na linha de cabeçalho (ou acima da lista).
-
-UI - Linha da Música: Adicionar um checkbox no início de cada linha de música no filteredTracks.map.
-
-UI - Botão Excluir Selecionados: Adicionar um botão (ex: perto da busca/filtros) que só aparece quando selectedTrackIds.size > 0.
-
-Implementar handleToggleSelect(trackId): Adiciona/remove um ID do selectedTrackIds.
-
-Implementar handleToggleSelectAll(): Seleciona/desseleciona todos os IDs visíveis (baseado em filteredTracks). Atualiza o estado selectedTrackIds.
-
-Implementar handleDeleteSelected():
-
-Mostrar um window.confirm perguntando se deseja excluir os selectedTrackIds.size itens selecionados.
-
-Se confirmado:
-
-Criar um array de promessas: Array.from(selectedTrackIds).map(id => axios.delete(\$\{API_URL}/api/tracks/${id}`))`.
-
-Usar Promise.all() para executar todas as requisições DELETE.
-
-Mostrar toast.success ou toast.error com base no resultado.
-
-Chamar fetchTracks() para atualizar a lista.
-
-Limpar selectedTrackIds (setSelectedTrackIds(new Set())).
-
-(Backend Opcional):
-
-Criar rota DELETE /api/tracks/batch em server/src/routes/trackRoutes.js.
-
-Criar função deleteMultipleTracks em server/src/controllers/trackController.js que recebe req.body.ids (um array de IDs) e executa DELETE FROM tracks WHERE id IN (?), [ids].
-
-Modificar handleDeleteSelected no frontend para chamar essa nova rota única em vez de múltiplos deletes.
+Implementar MC.7.2 (Frontend): Adicionar a lógica de seleção e o botão no frontend.
