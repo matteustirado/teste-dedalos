@@ -7,6 +7,8 @@ const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/videos'
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY
 const ytDlpWrap = new YtDlpWrap.default()
 
+const ALL_DAYS_ARRAY = [0, 1, 2, 3, 4, 5, 6];
+
 const parseYoutubeUrl = (url) => {
   try {
     const videoUrl = new URL(url)
@@ -80,7 +82,7 @@ export const fetchYoutubeData = async (req, res) => {
     res.json(videoData)
 
   } catch (err) {
-    console.error(err.message)
+    console.error("fetchYoutubeData - Erro:", err.message);
     const errorMsg = err.response?.data?.error || 'Erro ao buscar dados do YouTube.'
     res.status(500).json({ error: errorMsg })
   }
@@ -180,7 +182,7 @@ export const addTrack = async (req, res) => {
     end_segundos,
     is_commercial,
     dias_semana 
-  } = req.body
+  } = req.body;
 
   if (!youtube_id || !titulo || !artista) {
     return res.status(400).json({ error: 'YouTube ID, Título e Artista são obrigatórios.'})
@@ -189,12 +191,20 @@ export const addTrack = async (req, res) => {
   let processedAno = null; 
   if (ano !== '' && ano != null) {
     const anoInt = parseInt(ano, 10);
-    if (!isNaN(anoInt)) {
-      processedAno = anoInt; 
-    }
+    if (!isNaN(anoInt)) { processedAno = anoInt; }
   }
   
-  const diasSemanaArray = Array.isArray(dias_semana) ? dias_semana : [];
+  const diasSemanaArray = (Array.isArray(dias_semana) && dias_semana.length > 0)
+    ? dias_semana
+    : ALL_DAYS_ARRAY;
+  
+  let stringifiedDiasSemana;
+  try {
+      stringifiedDiasSemana = JSON.stringify(diasSemanaArray);
+  } catch (stringifyErr) {
+      console.error("Erro Crítico: Falha ao stringificar diasSemanaArray em addTrack:", stringifyErr);
+      stringifiedDiasSemana = JSON.stringify(ALL_DAYS_ARRAY); // Fallback mais seguro
+  }
 
   try {
     const newTrack = {
@@ -211,7 +221,7 @@ export const addTrack = async (req, res) => {
       start_segundos,
       end_segundos,
       is_commercial,
-      dias_semana: JSON.stringify(diasSemanaArray), 
+      dias_semana: stringifiedDiasSemana,
       status_processamento: 'PENDENTE'
     }
 
@@ -222,20 +232,38 @@ export const addTrack = async (req, res) => {
     analyzeLoudness(result.insertId, youtube_id)
 
   } catch (err) {
-    console.error(err.message)
+    console.error("addTrack - Erro durante INSERT:", err);
     res.status(500).json({ error: 'Erro ao salvar dados no banco.' })
   }
 }
 
-const safeJsonParse = (jsonString) => {
-  if (!jsonString) return [];
-  try {
-    const parsed = JSON.parse(jsonString);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
+// --- safeJsonParse CORRIGIDA ---
+const safeJsonParse = (input) => {
+  // 1. Se já for um array, apenas retorna (assume que o driver já parseou)
+  if (Array.isArray(input)) {
+    // Opcional: Validar se os elementos são números, se necessário
+    // return input.map(Number).filter(n => !isNaN(n));
+    return input;
+  }
+
+  // 2. Se for uma string vazia ou null/undefined, retorna array vazio
+  if (!input || typeof input !== 'string') {
     return [];
   }
+
+  // 3. Se for uma string, tenta fazer o parse
+  try {
+    // Opcional: Limpeza da string (pode não ser mais necessária se o save estiver correto)
+    // const cleanedString = input.replace(/\s+/g, '').replace(/,\s*]/, ']');
+    const parsed = JSON.parse(input); // Tenta parsear a string original
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.error("safeJsonParse - Erro no parse da string:", e, "- String original:", input); // Loga o erro e a string
+    return []; // Retorna array vazio em caso de erro no parse
+  }
 };
+// --- FIM safeJsonParse CORRIGIDA ---
+
 
 export const listTracks = async (req, res) => {
   try {
@@ -244,11 +272,12 @@ export const listTracks = async (req, res) => {
     const processedRows = rows.map(track => ({
       ...track,
       artistas_participantes: safeJsonParse(track.artistas_participantes),
-      dias_semana: safeJsonParse(track.dias_semana)
+      dias_semana: safeJsonParse(track.dias_semana) // Usa a função corrigida
     }));
     
     res.json(processedRows);
   } catch (err) {
+    console.error("listTracks - Erro:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -268,17 +297,26 @@ export const updateTrack = async (req, res) => {
     end_segundos,
     is_commercial,
     dias_semana 
-  } = req.body
+  } = req.body;
 
   let processedAno = null; 
   if (ano !== '' && ano != null) {
      const anoInt = parseInt(ano, 10);
-   if (!isNaN(anoInt)) {
-      processedAno = anoInt;
-    }
+   if (!isNaN(anoInt)) { processedAno = anoInt; }
   }
 
-  const diasSemanaArray = Array.isArray(dias_semana) ? dias_semana : [];
+  const diasSemanaArray = (Array.isArray(dias_semana) && dias_semana.length > 0)
+    ? dias_semana
+    : ALL_DAYS_ARRAY;
+
+  let stringifiedDiasSemana;
+  try {
+      stringifiedDiasSemana = JSON.stringify(diasSemanaArray);
+  } catch (stringifyErr) {
+      console.error("Erro Crítico: Falha ao stringificar diasSemanaArray em updateTrack:", stringifyErr);
+      stringifiedDiasSemana = JSON.stringify(ALL_DAYS_ARRAY);
+  }
+
 
   try {
     const fieldsToUpdate = {
@@ -293,26 +331,34 @@ export const updateTrack = async (req, res) => {
       start_segundos,
       end_segundos,
       is_commercial,
-      dias_semana: JSON.stringify(diasSemanaArray) 
+      dias_semana: stringifiedDiasSemana
     }
 
-    await pool.query('UPDATE tracks SET ? WHERE id = ?', [fieldsToUpdate, id])
-    res.json({ message: 'Música atualizada com sucesso!' })
+    const [result] = await pool.query('UPDATE tracks SET ? WHERE id = ?', [fieldsToUpdate, id]);
+
+    if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Música não encontrada para atualização.' });
+    }
+
+    res.json({ message: 'Música atualizada com sucesso!' });
 
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Erro ao atualizar a música.' })
+    console.error(`updateTrack (ID: ${id}) - Erro durante UPDATE:`, err);
+    res.status(500).json({ error: 'Erro ao atualizar a música.' });
   }
 }
 
 export const deleteTrack = async (req, res) => {
   const { id } = req.params
   try {
-    await pool.query('DELETE FROM tracks WHERE id = ?', [id])
-    res.json({ message: 'Música deletada com sucesso!' })
+    const [result] = await pool.query('DELETE FROM tracks WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Música não encontrada para deletar.' });
+    }
+    res.json({ message: 'Música deletada com sucesso!' });
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Erro ao deletar a música.' })
+    console.error(`deleteTrack (ID: ${id}) - Erro:`, err);
+    res.status(500).json({ error: 'Erro ao deletar a música.' });
   }
 }
 

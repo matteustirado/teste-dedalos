@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
+import { toast } from 'react-toastify'; // PC.1: Importar toast
 
 const API_URL = 'http://localhost:4000'
 const WEEK_DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 const ALL_DAYS_CODE = -1
+const DURATION_WARNING_SECONDS = 24 * 3600; // PC.4: Limite de 24 horas
 
 export default function PlaylistCreator() {
   const navigate = useNavigate()
@@ -15,9 +17,10 @@ export default function PlaylistCreator() {
   const [newPlaylist, setNewPlaylist] = useState({
     name: '',
     description: '',
-    cover: null, 
-    coverFile: null 
+    cover: null,
+    coverFile: null
   })
+  const [originalCover, setOriginalCover] = useState(null); // PC.6: Para rastrear a capa original
   
   const [acervoTracks, setAcervoTracks] = useState([])
   const [playlistTracks, setPlaylistTracks] = useState([])
@@ -25,31 +28,33 @@ export default function PlaylistCreator() {
   const [draggedTrack, setDraggedTrack] = useState(null)
   const [isLive, setIsLive] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  // const [error, setError] = useState(null) // PC.1: Removido
   const [selectedDayFilter, setSelectedDayFilter] = useState(ALL_DAYS_CODE)
 
   useEffect(() => {
     const fetchInitialData = async () => {
       setLoading(true);
-      setError(null);
+      // setError(null); // PC.1
       try {
         const tracksResponse = await axios.get(`${API_URL}/api/tracks`);
+        // Usar dados da versão 'd2ed7...' que já vem com 'thumbnail_url'
         const processedTracks = tracksResponse.data.filter(t => t.status_processamento === 'PROCESSADO');
         setAcervoTracks(processedTracks);
         setAllTracksForLookup(processedTracks);
 
         if (isEditMode) {
           const playlistResponse = await axios.get(`${API_URL}/api/playlists/${playlistId}`);
-          const playlistData = playlistResponse.data;
+          const playlistData = playlistResponse.data; // Backend 'd2ed7...' já parseia 'tracks_ids'
 
           setNewPlaylist({
             name: playlistData.nome || '',
             description: playlistData.descricao || '',
-            cover: playlistData.imagem || null, 
-            coverFile: null 
+            cover: playlistData.imagem || null,
+            coverFile: null
           });
+          setOriginalCover(playlistData.imagem || null); // PC.6
 
-          const trackIdsInPlaylist = playlistData.tracks_ids || [];
+          const trackIdsInPlaylist = playlistData.tracks_ids || []; // Já deve ser array
 
           const tracksForPlaylist = trackIdsInPlaylist
             .map(id => processedTracks.find(track => track.id === Number(id)))
@@ -59,11 +64,12 @@ export default function PlaylistCreator() {
 
       } catch (err) {
         console.error("Erro ao buscar dados iniciais:", err);
-        setError(isEditMode ? "Não foi possível carregar a playlist para edição." : "Não foi possível carregar as músicas do acervo.");
+        const errorMsg = isEditMode ? "Não foi possível carregar a playlist para edição." : "Não foi possível carregar as músicas do acervo.";
+        // setError(errorMsg); // PC.1
+        toast.error(errorMsg);
         if (isEditMode && err.response?.status === 404) {
-             setError("Playlist não encontrada.");
-        } else if (isEditMode) {
-           // Outros erros
+             // setError("Playlist não encontrada."); // PC.1
+             toast.error("Playlist não encontrada.");
         }
       } finally {
         setLoading(false);
@@ -76,23 +82,29 @@ export default function PlaylistCreator() {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        setError("A imagem da capa não pode exceder 2MB.");
+        // setError("A imagem da capa não pode exceder 2MB."); // PC.1
+        toast.warn("A imagem da capa não pode exceder 2MB.");
         return;
       }
-      
       const previewUrl = URL.createObjectURL(file);
       setNewPlaylist(prev => ({
         ...prev,
-        cover: previewUrl, 
-        coverFile: file     
+        cover: previewUrl,
+        coverFile: file
       }));
-      setError(null);
-      
-      e.target.value = null;
+      // setError(null); // PC.1
+       e.target.value = null;
     }
   }
 
   const addTrack = (track) => {
+    // PC.3: Alerta de Duplicidade (últimas 5)
+    const recentTracks = playlistTracks.slice(-5); // Pega as últimas 5
+    const isRecentDuplicate = recentTracks.some(t => t.id === track.id);
+    
+    if (isRecentDuplicate) {
+        toast.info(`"${track.titulo}" foi adicionada recentemente.`);
+    }
     setPlaylistTracks([...playlistTracks, track])
   }
 
@@ -156,51 +168,73 @@ export default function PlaylistCreator() {
     }, 0)
   }, [playlistTracks, allTracksForLookup])
 
- const savePlaylist = async () => {
+ const savePlaylist = async (exitOnSave = true) => { // PC.5
     if (!newPlaylist.name || playlistTracks.length === 0) {
-      setError("A playlist precisa de um nome e pelo menos uma música.")
+      // setError("A playlist precisa de um nome e pelo menos uma música.") // PC.1
+      toast.warn("A playlist precisa de um nome e pelo menos uma música.");
       return
     }
-    setError(null)
+    // setError(null) // PC.1
     setLoading(true);
 
     const formData = new FormData();
     formData.append('name', newPlaylist.name);
     formData.append('description', newPlaylist.description);
-    
     formData.append('tracks_ids', JSON.stringify(playlistTracks.map(t => t.id)));
 
-    
     if (newPlaylist.coverFile) {
-        formData.append('cover', newPlaylist.coverFile); 
+        formData.append('cover', newPlaylist.coverFile);
     }
 
      if (isEditMode) {
-       if (typeof newPlaylist.cover === 'string' && !newPlaylist.cover.startsWith('blob:') && !newPlaylist.coverFile) {
-          formData.append('existingImagePath', newPlaylist.cover);
-       } else if (!newPlaylist.coverFile) {
-           formData.append('existingImagePath', ''); 
-       }
+        if ((!newPlaylist.cover || newPlaylist.cover.startsWith('blob:')) && originalCover) {
+           formData.append('existingImagePath', originalCover);
+        } 
+        else if (typeof newPlaylist.cover === 'string' && !newPlaylist.cover.startsWith('blob:')) {
+           formData.append('existingImagePath', newPlaylist.cover);
+        }
+        else if (!newPlaylist.coverFile) {
+           formData.append('existingImagePath', '');
+        }
     }
 
 
     try {
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      };
+      const config = { headers: { 'Content-Type': 'multipart/form-data' } };
+      
+      let newId = playlistId;
 
       if (isEditMode) {
         await axios.put(`${API_URL}/api/playlists/${playlistId}`, formData, config);
+        toast.success("Playlist atualizada com sucesso!"); // PC.1
       } else {
-        await axios.post(`${API_URL}/api/playlists`, formData, config);
+        const response = await axios.post(`${API_URL}/api/playlists`, formData, config);
+        newId = response.data.id;
+        toast.success("Playlist salva com sucesso!"); // PC.1
       }
-      navigate('/radio/library');
+      
+      if (exitOnSave) {
+          navigate('/radio/library'); // PC.5: Sair
+      } else if (!isEditMode && newId) {
+          // PC.5: Salvar e Continuar (modo criação) -> Navega para modo edição
+          navigate(`/radio/playlist-creator/${newId}`, { replace: true });
+          // Atualiza o originalCover após salvar pela primeira vez
+          const newCoverUrl = (await axios.get(`${API_URL}/api/playlists/${newId}`)).data.imagem;
+          setOriginalCover(newCoverUrl || null);
+      } else {
+          // PC.5: Modo edição, 'Salvar' clicado, atualiza o originalCover
+          const updatedPlaylist = await axios.get(`${API_URL}/api/playlists/${playlistId}`);
+          const newCoverUrl = updatedPlaylist.data.imagem;
+          setOriginalCover(newCoverUrl || null);
+          // Reseta o coverFile para evitar re-upload acidental
+          setNewPlaylist(prev => ({...prev, cover: newCoverUrl || null, coverFile: null}));
+      }
+
     } catch (err) {
       console.error("Erro ao salvar/atualizar playlist", err);
        const errorMsg = err.response?.data?.error || (isEditMode ? "Falha ao atualizar a playlist." : "Falha ao salvar a playlist.");
-      setError(errorMsg);
+      // setError(errorMsg); // PC.1
+      toast.error(errorMsg);
     } finally {
        setLoading(false);
     }
@@ -209,16 +243,21 @@ export default function PlaylistCreator() {
 
   const clearPlaylistTracks = () => {
     setPlaylistTracks([])
-    setError(null)
+    // setError(null) // PC.1
   }
   
+  // PC.3: Lógica de checagem de proximidade (5 anteriores)
   const checkProximity = (index) => {
      if (playlistTracks.length < 2) return false;
      const currentId = playlistTracks[index].id;
-     const prevId = index > 0 ? playlistTracks[index - 1].id : null;
-     const nextId = index < playlistTracks.length - 1 ? playlistTracks[index + 1].id : null;
-     
-     return currentId === prevId || currentId === nextId;
+     const startIndex = Math.max(0, index - 5);
+
+     for (let i = startIndex; i < index; i++) {
+         if (playlistTracks[i].id === currentId) {
+             return true;
+         }
+     }
+     return false;
   }
 
   const filteredAcervo = useMemo(() => {
@@ -230,17 +269,14 @@ export default function PlaylistCreator() {
       if (dayFilterValue === null) {
         dayMatch = true;
       } else {
+        // Backend 'd2ed7...' já parseia dias_semana
         const trackDaysNumbers = Array.isArray(track.dias_semana) ? track.dias_semana : [];
         dayMatch = trackDaysNumbers.includes(dayFilterValue);
       }
 
-      if (!dayMatch) {
-        return false;
-      }
+      if (!dayMatch) { return false; }
+      if (!searchTerm) { return true; }
 
-      if (!searchTerm) {
-        return true;
-      }
       const titleMatch = track.titulo.toLowerCase().includes(lowerSearchTerm);
       const artistMatch = track.artista && track.artista.toLowerCase().includes(lowerSearchTerm);
 
@@ -314,15 +350,10 @@ export default function PlaylistCreator() {
             <p className="text-text-muted text-sm">{isEditMode ? 'Modifique os detalhes da sua playlist' : 'Crie sua playlist personalizada'}</p>
           </div>
 
-          {error && (
-            <div className="bg-red-500/20 text-red-400 p-3 rounded-lg mb-4 text-sm flex justify-between items-center">
-              <span>{error}</span>
-               <button onClick={() => setError(null)} className="material-symbols-outlined text-lg">close</button>
-            </div>
-          )}
+          {/* PC.1: Div de erro removida */}
 
           <div className="liquid-glass rounded-xl p-6 mb-6">
-             <h2 className="text-xl font-bold text-white mb-4">Informações da Playlist</h2>
+              <h2 className="text-xl font-bold text-white mb-4">Informações da Playlist</h2>
             <div className="flex gap-6">
               <div className="flex-1 space-y-3">
                 <div>
@@ -336,11 +367,20 @@ export default function PlaylistCreator() {
               </div>
               <div className="flex flex-col items-center gap-3">
                 <label className="block text-xs font-medium text-text-muted">Capa</label>
-                <div className="w-32 h-32 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden border-2 border-dashed border-white/20">
+                <div className="w-32 h-32 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden border-2 border-dashed border-white/20 relative">
                   {coverImageUrl ? (
                     <img src={coverImageUrl} alt="Cover Preview" className="w-full h-full object-cover" />
                   ) : (
                     <span className="material-symbols-outlined text-5xl text-text-muted">add_photo_alternate</span>
+                  )}
+                  {coverImageUrl && (
+                      <button
+                          onClick={() => setNewPlaylist(prev => ({...prev, cover: null, coverFile: null}))}
+                          className="absolute top-1 right-1 z-10 p-0.5 bg-black/60 rounded-full text-white hover:bg-black/80 transition-colors"
+                          title="Remover Imagem"
+                      >
+                          <span className="material-symbols-outlined text-base">close</span>
+                      </button>
                   )}
                 </div>
                 <label className="cursor-pointer bg-primary/20 text-primary px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/30 transition-colors w-full text-center">
@@ -351,9 +391,9 @@ export default function PlaylistCreator() {
             </div>
           </div>
 
-          {!loading && !error && (
+          {!loading && (
             <>
-               <div className="grid grid-cols-2 gap-6 mb-6 items-start"> {/* items-start adicionado aqui */}
+               <div className="grid grid-cols-2 gap-6 mb-6 items-start">
                  <div className="liquid-glass rounded-xl p-6 flex flex-col">
                      <h2 className="text-xl font-bold text-white mb-4">Todas as Músicas</h2>
                      <div className="flex gap-2 items-center mb-4 flex-wrap"> 
@@ -394,11 +434,15 @@ export default function PlaylistCreator() {
                            onClick={() => addTrack(track)}
                            className="flex items-center gap-3 p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer group"
                          >
-                           <div className="w-8 h-8 rounded bg-gradient-to-br from-primary/50 to-red-600/50 flex items-center justify-center flex-shrink-0">
-                               <span className="material-symbols-outlined text-white text-base">
-                                 {track.is_commercial ? 'campaign' : 'music_note'}
-                               </span>
-                           </div>
+                           {track.thumbnail_url ? (
+                                <img src={track.thumbnail_url} alt="Thumbnail" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-white/10" loading="lazy" />
+                           ) : (
+                               <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/10">
+                                   <span className="material-symbols-outlined text-text-muted text-base">
+                                     {track.is_commercial ? 'campaign' : 'music_note'}
+                                   </span>
+                               </div>
+                           )}
                            <div className="flex-1 min-w-0">
                                <p className="text-white font-medium text-sm truncate">{track.titulo}</p>
                                <p className="text-text-muted text-xs truncate">{track.artista}</p>
@@ -413,59 +457,74 @@ export default function PlaylistCreator() {
                  </div>
 
                  <div className="liquid-glass rounded-xl p-6 flex flex-col">
-                   <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-white">Músicas da Playlist</h2>
-                    <div className="text-text-muted text-sm text-right"> 
-                       <span className="font-semibold">{playlistTracks.length}</span> músicas<br/> 
+                    <div className="flex justify-between items-center mb-4">
+                     <h2 className="text-xl font-bold text-white">Músicas da Playlist</h2>
+                     <div className={`text-sm text-right ${getTotalDurationSeconds > DURATION_WARNING_SECONDS ? 'text-yellow-400' : 'text-text-muted'}`}>
+                       <span className="font-semibold">{playlistTracks.length}</span> músicas<br/>
                        <span className="font-semibold">{formatTotalDuration(getTotalDurationSeconds)}</span>
+                       {getTotalDurationSeconds > DURATION_WARNING_SECONDS && (
+                           <span className="material-symbols-outlined text-base align-middle ml-1" title="Duração da playlist excede 24 horas!">warning</span>
+                       )}
+                     </div>
                     </div>
-                   </div>
-                  <div className="flex-1 overflow-y-auto space-y-2 pr-2 -mr-2 max-h-[500px]">
-                    {playlistTracks.length === 0 && <p className="text-text-muted text-center text-sm">Arraste ou clique nas músicas à esquerda para adicionar.</p>}
-                    {playlistTracks.map((track, index) => {
-                       const isClose = checkProximity(index);
-                       return (
-                           <div
-                             key={`${track.id}-${index}`}
-                             draggable
-                             onDragStart={() => handleDragStart(track, index)}
-                             onDragOver={handleDragOver}
-                             onDrop={() => handleDrop(index)}
-                             className={`flex items-center gap-3 p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-move group relative ${draggedTrack?.originalIndex === index ? 'opacity-30' : ''}`}
-                           >
-                             {isClose && (
-                               <span className="material-symbols-outlined text-yellow-400 text-base absolute -left-1 -top-1" title="Música repetida muito próxima">warning</span>
-                             )}
-                             <span className="material-symbols-outlined text-text-muted text-lg cursor-grab flex-shrink-0">drag_indicator</span>
-                             <span className="text-text-muted font-mono text-sm w-6 text-right flex-shrink-0">{index + 1}</span>
-                             <div className="flex-1 min-w-0">
-                               <p className="text-white font-semibold text-sm truncate">{track.titulo}</p>
-                               <p className="text-text-muted text-xs truncate">{track.artista}</p>
+                   <div className="flex-1 overflow-y-auto space-y-2 pr-2 -mr-2 max-h-[500px]">
+                      {playlistTracks.length === 0 && <p className="text-text-muted text-center text-sm">Arraste ou clique nas músicas à esquerda para adicionar.</p>}
+                      {playlistTracks.map((track, index) => {
+                         const isClose = checkProximity(index);
+                         return (
+                             <div
+                               key={`${track.id}-${index}`}
+                               draggable
+                               onDragStart={() => handleDragStart(track, index)}
+                               onDragOver={handleDragOver}
+                               onDrop={() => handleDrop(index)}
+                               className={`flex items-center gap-3 p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-move group relative ${draggedTrack?.originalIndex === index ? 'opacity-30' : ''}`}
+                             >
+                               {isClose && (
+                                 <span className="material-symbols-outlined text-yellow-400 text-base absolute -left-1 -top-1" title="Música tocada nas últimas 5 faixas">warning</span>
+                               )}
+                               <span className="material-symbols-outlined text-text-muted text-lg cursor-grab flex-shrink-0">drag_indicator</span>
+                               {track.thumbnail_url ? (
+                                    <img src={track.thumbnail_url} alt="Thumbnail" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-white/10" loading="lazy" />
+                               ) : (
+                                   <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/10">
+                                       <span className="material-symbols-outlined text-text-muted text-base">
+                                         {track.is_commercial ? 'campaign' : 'music_note'}
+                                       </span>
+                                   </div>
+                               )}
+                               <span className="text-text-muted font-mono text-sm w-6 text-right flex-shrink-0">{index + 1}</span>
+                               <div className="flex-1 min-w-0">
+                                 <p className="text-white font-semibold text-sm truncate">{track.titulo}</p>
+                                 <p className="text-text-muted text-xs truncate">{track.artista}</p>
+                               </div>
+                               <span className="text-text-muted text-xs flex-shrink-0 ml-2">
+                                 {formatDuration(track.end_segundos ? track.end_segundos - track.start_segundos : track.duracao_segundos - track.start_segundos)}
+                               </span>
+                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                 <button onClick={() => removeTrack(index)} className="p-1 hover:bg-red-500/20 rounded-lg">
+                                   <span className="material-symbols-outlined text-red-500 text-base">delete</span>
+                                 </button>
+                               </div>
                              </div>
-                             <span className="text-text-muted text-xs flex-shrink-0 ml-2">
-                               {formatDuration(track.end_segundos ? track.end_segundos - track.start_segundos : track.duracao_segundos - track.start_segundos)}
-                             </span>
-                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                               <button onClick={() => removeTrack(index)} className="p-1 hover:bg-red-500/20 rounded-lg">
-                                 <span className="material-symbols-outlined text-red-500 text-base">delete</span>
-                               </button>
-                             </div>
-                           </div>
-                         )
-                       })}
-                   </div>
-                   {playlistTracks.length > 0 && (
+                           )
+                         })}
+                    </div>
+                    {playlistTracks.length > 0 && (
                        <button onClick={clearPlaylistTracks} disabled={loading} className="mt-4 w-full bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/20 transition-colors disabled:opacity-50">
                          Limpar Lista
-                       </button>
-                   )}
+                      </button>
+                    )}
                  </div>
                </div>
 
                <div className="flex justify-end gap-4">
                  <button onClick={() => navigate('/radio/library')} disabled={loading} className=" bg-white/10 text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/20 transition-colors disabled:opacity-50">Cancelar</button>
-                 <button onClick={savePlaylist} disabled={loading || playlistTracks.length === 0} className=" bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                   {isEditMode ? 'Atualizar Playlist' : 'Salvar Playlist'}
+                 <button onClick={() => savePlaylist(false)} disabled={loading || playlistTracks.length === 0} className=" bg-primary/70 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                   {loading ? 'Salvando...' : (isEditMode ? 'Atualizar' : 'Salvar')}
+                 </button>
+                 <button onClick={() => savePlaylist(true)} disabled={loading || playlistTracks.length === 0} className=" bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                   {loading ? 'Salvando...' : (isEditMode ? 'Atualizar e Sair' : 'Salvar e Sair')}
                  </button>
                </div>
             </>

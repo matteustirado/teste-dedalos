@@ -281,65 +281,65 @@ export default function MusicCollection() {
 
     return sorted;
 
-  }, [tracks, searchQuery, typeFilter, sortBy, sortOrder]) 
+  }, [tracks, searchQuery, typeFilter, sortBy, sortOrder])
 
   const handleToggleSelect = (trackId) => {
-      setSelectedTrackIds(prevSelectedIds => {
-          const newSet = new Set(prevSelectedIds);
-          if (newSet.has(trackId)) {
-              newSet.delete(trackId);
-          } else {
-              newSet.add(trackId);
-          }
-          return newSet;
-      });
+       setSelectedTrackIds(prevSelectedIds => {
+           const newSet = new Set(prevSelectedIds);
+           if (newSet.has(trackId)) {
+               newSet.delete(trackId);
+           } else {
+               newSet.add(trackId);
+           }
+           return newSet;
+       });
   };
 
   const areAllFilteredSelected = useMemo(() => {
-      if (filteredAndSortedTracks.length === 0) return false;
-      return filteredAndSortedTracks.every(track => selectedTrackIds.has(track.id));
+       if (filteredAndSortedTracks.length === 0) return false;
+       return filteredAndSortedTracks.every(track => selectedTrackIds.has(track.id));
   }, [filteredAndSortedTracks, selectedTrackIds]);
 
 
   const handleToggleSelectAll = () => {
-      if (areAllFilteredSelected) {
-          setSelectedTrackIds(prevSelectedIds => {
-              const newSet = new Set(prevSelectedIds);
-              filteredAndSortedTracks.forEach(track => newSet.delete(track.id));
-              return newSet;
-          });
-      } else {
-          setSelectedTrackIds(prevSelectedIds => {
-              const newSet = new Set(prevSelectedIds);
-              filteredAndSortedTracks.forEach(track => newSet.add(track.id));
-              return newSet;
-          });
-      }
+       if (areAllFilteredSelected) {
+           setSelectedTrackIds(prevSelectedIds => {
+               const newSet = new Set(prevSelectedIds);
+               filteredAndSortedTracks.forEach(track => newSet.delete(track.id));
+               return newSet;
+           });
+       } else {
+           setSelectedTrackIds(prevSelectedIds => {
+               const newSet = new Set(prevSelectedIds);
+               filteredAndSortedTracks.forEach(track => newSet.add(track.id));
+               return newSet;
+           });
+       }
   };
 
   const handleDeleteSelected = async () => {
-      if (selectedTrackIds.size === 0) {
-          toast.warn("Nenhuma mídia selecionada.");
-          return;
-      }
-      
-      if (window.confirm(`Tem certeza que deseja excluir ${selectedTrackIds.size} mídias selecionadas? Esta ação não pode ser desfeita.`)) {
-          setLoading(true);
-          const idsToDelete = Array.from(selectedTrackIds);
-          try {
-              const response = await axios.delete(`${API_URL}/api/tracks/batch`, {
-                  data: { ids: idsToDelete }
-              });
-              toast.success(response.data.message || `${idsToDelete.length} mídias excluídas.`);
-              setSelectedTrackIds(new Set());
-              fetchTracks();
-          } catch (err) {
-              console.error("Erro ao excluir mídias em lote:", err);
-              toast.error(err.response?.data?.error || "Falha ao excluir mídias selecionadas.");
-          } finally {
-              setLoading(false);
-          }
-      }
+       if (selectedTrackIds.size === 0) {
+           toast.warn("Nenhuma mídia selecionada.");
+           return;
+       }
+       
+       if (window.confirm(`Tem certeza que deseja excluir ${selectedTrackIds.size} mídias selecionadas? Esta ação não pode ser desfeita.`)) {
+           setLoading(true);
+           const idsToDelete = Array.from(selectedTrackIds);
+           try {
+               const response = await axios.delete(`${API_URL}/api/tracks/batch`, {
+                   data: { ids: idsToDelete }
+               });
+               toast.success(response.data.message || `${idsToDelete.length} mídias excluídas.`);
+               setSelectedTrackIds(new Set());
+               fetchTracks();
+           } catch (err) {
+               console.error("Erro ao excluir mídias em lote:", err);
+               toast.error(err.response?.data?.error || "Falha ao excluir mídias selecionadas.");
+           } finally {
+               setLoading(false);
+           }
+       }
   };
 
   const allDaysSelected = formData.dias_semana.length === 7;
@@ -348,46 +348,46 @@ export default function MusicCollection() {
     <div className="min-h-screen bg-gradient-warm flex">
       <aside className="fixed left-0 top-0 h-screen w-64 bg-bg-dark-primary/50 backdrop-blur-sm border-r border-white/10 p-4 flex flex-col justify-between z-10">
         <div className="flex flex-col gap-8">
-            <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-red-600 flex items-center justify-center">
-                <span className="material-symbols-outlined text-white text-2xl">music_video</span>
-                </div>
-                <div className="flex flex-col">
-                <h1 className="text-white text-lg font-bold leading-tight">Acervo</h1>
-                <p className="text-text-muted text-sm">Rádio Dedalos</p>
-                </div>
-            </div>
-            <nav className="flex flex-col gap-2">
-                <button onClick={() => navigate('/')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-                <span className="material-symbols-outlined">home</span>
-                <p className="text-base font-medium">Home</p>
-                </button>
-                <button onClick={() => navigate('/radio/dj')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-                <span className="material-symbols-outlined">radio</span>
-                <p className="text-base font-medium">Painel do DJ</p>
-                </button>
-                <button onClick={() => navigate('/radio/collection')} className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/20 text-primary border border-primary/50">
-                <span className="material-symbols-outlined">music_video</span>
-                <p className="text-base font-semibold">Acervo de Músicas</p>
-                </button>
-                <button onClick={() => navigate('/radio/playlist-creator')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-                <span className="material-symbols-outlined">playlist_add</span>
-                <p className="text-base font-medium">Criar Playlist</p>
-                </button>
-                <button onClick={() => navigate('/radio/library')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-                <span className="material-symbols-outlined">library_music</span>
-                <p className="text-base font-medium">Biblioteca</p>
-                </button>
-            </nav>
-            </div>
-            <div className="flex flex-col gap-3">
-            <button disabled className="flex w-full items-center justify-center rounded-lg h-12 px-4 text-white text-base font-bold bg-gray-600 cursor-not-allowed opacity-50">
-                <span className="truncate">Ao Vivo</span>
-            </button>
-            <div className="text-center text-xs text-text-muted pb-2">
-                <p>© Developed by: <span className="text-primary font-semibold">Matteus Tirado</span></p>
-            </div>
-            </div>
+           <div className="flex items-center gap-3">
+               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-red-600 flex items-center justify-center">
+               <span className="material-symbols-outlined text-white text-2xl">music_video</span>
+               </div>
+               <div className="flex flex-col">
+               <h1 className="text-white text-lg font-bold leading-tight">Acervo</h1>
+               <p className="text-text-muted text-sm">Rádio Dedalos</p>
+               </div>
+           </div>
+           <nav className="flex flex-col gap-2">
+               <button onClick={() => navigate('/')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
+               <span className="material-symbols-outlined">home</span>
+               <p className="text-base font-medium">Home</p>
+               </button>
+               <button onClick={() => navigate('/radio/dj')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
+               <span className="material-symbols-outlined">radio</span>
+               <p className="text-base font-medium">Painel do DJ</p>
+               </button>
+               <button onClick={() => navigate('/radio/collection')} className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/20 text-primary border border-primary/50">
+               <span className="material-symbols-outlined">music_video</span>
+               <p className="text-base font-semibold">Acervo de Músicas</p>
+               </button>
+               <button onClick={() => navigate('/radio/playlist-creator')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
+               <span className="material-symbols-outlined">playlist_add</span>
+               <p className="text-base font-medium">Criar Playlist</p>
+               </button>
+               <button onClick={() => navigate('/radio/library')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
+               <span className="material-symbols-outlined">library_music</span>
+               <p className="text-base font-medium">Biblioteca</p>
+               </button>
+           </nav>
+          </div>
+          <div className="flex flex-col gap-3">
+           <button disabled className="flex w-full items-center justify-center rounded-lg h-12 px-4 text-white text-base font-bold bg-gray-600 cursor-not-allowed opacity-50">
+               <span className="truncate">Ao Vivo</span>
+           </button>
+           <div className="text-center text-xs text-text-muted pb-2">
+               <p>© Developed by: <span className="text-primary font-semibold">Matteus Tirado</span></p>
+           </div>
+          </div>
       </aside>
 
       <main className="ml-64 flex-1 p-8">
@@ -416,9 +416,9 @@ export default function MusicCollection() {
                   className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/80 transition-all shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading && !tracks.length ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                    ) : (
-                        <span className="material-symbols-outlined">search</span>
+                       <span className="material-symbols-outlined">search</span>
                    )}
                   Buscar
                 </button>
@@ -428,21 +428,21 @@ export default function MusicCollection() {
             <div className="liquid-glass rounded-xl p-6 mb-6">
               <h2 className="text-xl font-bold text-white mb-4">{editingTrack ? 'Editar Mídia' : 'Configurar Nova Mídia'}</h2>
               <div className="flex gap-6 mb-6 border-b border-white/10 pb-6">
-                  {formData.thumbnail_url ? (
-                      <img
-                          src={formData.thumbnail_url}
-                          alt="Thumbnail"
-                          className="w-32 h-32 object-cover rounded-lg flex-shrink-0 border border-white/10"
-                      />
-                  ) : (
+                   {formData.thumbnail_url ? (
+                       <img
+                           src={formData.thumbnail_url}
+                           alt="Thumbnail"
+                           className="w-32 h-32 object-cover rounded-lg flex-shrink-0 border border-white/10"
+                       />
+                   ) : (
                        <div className="w-32 h-32 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/10">
                             <span className="material-symbols-outlined text-5xl text-text-muted">music_video</span>
                        </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                     <h3 className="text-lg font-semibold text-white truncate">{formData.titulo || 'Novo Título...'}</h3>
-                     <p className="text-sm text-text-muted truncate">{formData.artista || 'Novo Artista...'}</p>
-                  </div>
+                   )}
+                   <div className="flex-1 min-w-0">
+                       <h3 className="text-lg font-semibold text-white truncate">{formData.titulo || 'Novo Título...'}</h3>
+                       <p className="text-sm text-text-muted truncate">{formData.artista || 'Novo Artista...'}</p>
+                   </div>
               </div>
 
               <div className="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -535,51 +535,51 @@ export default function MusicCollection() {
               <h2 className="text-xl font-bold text-white whitespace-nowrap">Mídias no Acervo ({filteredAndSortedTracks.length})</h2>
               <div className="flex flex-wrap gap-x-4 gap-y-2 items-center">
                    <div className="relative">
-                      <select
-                          value={typeFilter}
-                          onChange={(e) => setTypeFilter(e.target.value)}
-                          className="appearance-none bg-white/10 border border-white/20 rounded-lg pl-3 pr-8 py-1.5 text-white text-xs focus:ring-1 focus:ring-primary cursor-pointer"
-                      >
-                          <option className="bg-bg-dark-primary text-white" value="TODOS">Tipo: Todos</option>
-                          <option className="bg-bg-dark-primary text-white" value="Música">Tipo: Música</option>
-                          <option className="bg-bg-dark-primary text-white" value="Comercial">Tipo: Comercial</option>
-                      </select>
-                      <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-base">expand_more</span>
-                  </div>
-                  {/* 1. Filtro de Status Removido */}
-                  {/* <div className="relative"> ... </div> */}
-                   <div className="relative">
-                      <select
-                          value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value)}
-                          className="appearance-none bg-white/10 border border-white/20 rounded-lg pl-3 pr-8 py-1.5 text-white text-xs focus:ring-1 focus:ring-primary cursor-pointer"
-                      >
-                          <option className="bg-bg-dark-primary text-white" value="created_at">Ordenar por: Data</option>
-                          <option className="bg-bg-dark-primary text-white" value="titulo">Ordenar por: Título</option>
-                          <option className="bg-bg-dark-primary text-white" value="artista">Ordenar por: Artista</option>
-                          <option className="bg-bg-dark-primary text-white" value="duration">Ordenar por: Duração</option>
-                      </select>
-                      <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-base">expand_more</span>
-                  </div>
-                  <button
-                      onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                      className="p-1.5 bg-white/10 border border-white/20 rounded-lg text-white hover:bg-white/20 transition-colors h-[31px] w-[31px] flex items-center justify-center" // Ajustado height/width
-                      title={sortOrder === 'asc' ? "Ordem Crescente" : "Ordem Decrescente"}
-                  >
+                       <select
+                           value={typeFilter}
+                           onChange={(e) => setTypeFilter(e.target.value)}
+                           className="appearance-none bg-white/10 border border-white/20 rounded-lg pl-3 pr-8 py-1.5 text-white text-xs focus:ring-1 focus:ring-primary cursor-pointer"
+                       >
+                           <option className="bg-bg-dark-primary text-white" value="TODOS">Tipo: Todos</option>
+                           <option className="bg-bg-dark-primary text-white" value="Música">Tipo: Música</option>
+                           <option className="bg-bg-dark-primary text-white" value="Comercial">Tipo: Comercial</option>
+                       </select>
+                       <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-base">expand_more</span>
+                   </div>
+
+
+                    <div className="relative">
+                       <select
+                           value={sortBy}
+                           onChange={(e) => setSortBy(e.target.value)}
+                           className="appearance-none bg-white/10 border border-white/20 rounded-lg pl-3 pr-8 py-1.5 text-white text-xs focus:ring-1 focus:ring-primary cursor-pointer"
+                       >
+                           <option className="bg-bg-dark-primary text-white" value="created_at">Ordenar por: Data</option>
+                           <option className="bg-bg-dark-primary text-white" value="titulo">Ordenar por: Título</option>
+                           <option className="bg-bg-dark-primary text-white" value="artista">Ordenar por: Artista</option>
+                           <option className="bg-bg-dark-primary text-white" value="duration">Ordenar por: Duração</option>
+                       </select>
+                       <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-base">expand_more</span>
+                   </div>
+                 <button
+                       onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                       className="p-1.5 bg-white/10 border border-white/20 rounded-lg text-white hover:bg-white/20 transition-colors h-[31px] w-[31px] flex items-center justify-center"
+                       title={sortOrder === 'asc' ? "Ordem Crescente" : "Ordem Decrescente"}
+                 >
                        <span className="material-symbols-outlined text-sm leading-none"> 
-                          {sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+                           {sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'}
                        </span>
-                  </button>
-                   {selectedTrackIds.size > 0 && (
-                      <button
-                          onClick={handleDeleteSelected}
-                          disabled={loading}
-                          className="flex items-center gap-1.5 bg-red-600/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                          <span className="material-symbols-outlined text-base leading-none">delete</span>
-                          Excluir ({selectedTrackIds.size})
-                      </button>
-                   )}
+                 </button>
+                  {selectedTrackIds.size > 0 && (
+                       <button
+                           onClick={handleDeleteSelected}
+                           disabled={loading}
+                           className="flex items-center gap-1.5 bg-red-600/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                       >
+                           <span className="material-symbols-outlined text-base leading-none">delete</span>
+                           Excluir ({selectedTrackIds.size})
+                       </button>
+                  )}
                 <input
                   type="text"
                   placeholder="Buscar..."
@@ -591,38 +591,38 @@ export default function MusicCollection() {
             </div>
 
             <div className="flex items-center p-3 rounded-lg bg-white/5 mb-2">
-                <div className="w-6 mr-3 flex-shrink-0">
-                     <input
-                        type="checkbox"
-                        checked={areAllFilteredSelected}
-                        onChange={handleToggleSelectAll}
-                        disabled={filteredAndSortedTracks.length === 0}
-                        title={areAllFilteredSelected ? "Desselecionar Todos Visíveis" : "Selecionar Todos Visíveis"}
-                        className="w-4 h-4 rounded bg-white/20 border-white/30 text-primary focus:ring-primary"
-                    />
-                </div>
-                <div className="w-10 mr-4 flex-shrink-0">
-                    <span className="text-xs font-semibold text-text-muted"></span>
-                </div>
-                <div className="flex-1 min-w-0">
-                     <span className="text-xs font-semibold text-text-muted">TÍTULO / ARTISTA</span>
-                </div>
-                <div className="flex items-center gap-4 flex-shrink-0 ml-4">
-                    <span className="text-xs font-semibold text-text-muted px-2 text-center">STATUS</span>
-                    <span className="text-xs font-semibold text-text-muted w-20 text-right">DURAÇÃO</span>
-                    <span className="text-xs font-semibold text-text-muted w-[52px] text-right">AÇÕES</span>
-                </div>
+                 <div className="w-6 mr-3 flex-shrink-0">
+                      <input
+                           type="checkbox"
+                           checked={areAllFilteredSelected}
+                           onChange={handleToggleSelectAll}
+                           disabled={filteredAndSortedTracks.length === 0}
+                           title={areAllFilteredSelected ? "Desselecionar Todos Visíveis" : "Selecionar Todos Visíveis"}
+                           className="w-4 h-4 rounded bg-white/20 border-white/30 text-primary focus:ring-primary"
+                       />
+                 </div>
+                 <div className="w-10 mr-4 flex-shrink-0">
+                      <span className="text-xs font-semibold text-text-muted"></span>
+                 </div>
+                 <div className="flex-1 min-w-0">
+                      <span className="text-xs font-semibold text-text-muted">TÍTULO / ARTISTA</span>
+                 </div>
+                 <div className="flex items-center gap-4 flex-shrink-0 ml-4">
+                      <span className="text-xs font-semibold text-text-muted px-2 text-center">STATUS</span>
+                      <span className="text-xs font-semibold text-text-muted w-20 text-right">DURAÇÃO</span>
+                      <span className="text-xs font-semibold text-text-muted w-[52px] text-right">AÇÕES</span>
+                 </div>
             </div>
 
 
             <div className="space-y-2">
               {loading && tracks.length === 0 && (
-                  <div className="text-center text-text-muted p-6">
-                      <div className="flex justify-center items-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                          <span className="ml-3">Carregando acervo...</span>
-                      </div>
-                  </div>
+                   <div className="text-center text-text-muted p-6">
+                       <div className="flex justify-center items-center">
+                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                           <span className="ml-3">Carregando acervo...</span>
+                       </div>
+                   </div>
               )}
               {!loading && filteredAndSortedTracks.length === 0 && (
                 <p className="text-text-muted text-center py-4">{tracks.length > 0 ? 'Nenhum resultado encontrado com os filtros atuais.' : 'Nenhuma música encontrada no acervo.'}</p>
@@ -657,7 +657,7 @@ export default function MusicCollection() {
                     ) : (
                          <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center mr-4 flex-shrink-0 border border-white/10">
                              <span className="material-symbols-outlined text-xl text-text-muted">
-                                {track.is_commercial ? 'campaign' : 'music_note'}
+                                 {track.is_commercial ? 'campaign' : 'music_note'}
                              </span>
                          </div>
                     )}
