@@ -5,6 +5,7 @@ import morgan from 'morgan'
 import pool from './src/config/db.js'
 import trackRoutes from './src/routes/trackRoutes.js'
 import playlistRoutes from './src/routes/playlistRoutes.js'
+import scheduleRoutes from './src/routes/scheduleRoutes.js'
 import path from 'path' 
 import { fileURLToPath } from 'url'; 
 
@@ -26,6 +27,7 @@ app.use('/assets/upload/covers', express.static(path.join(__dirname, 'src/assets
 
 app.use('/api/tracks', trackRoutes)
 app.use('/api/playlists', playlistRoutes)
+app.use('/api/agendamentos', scheduleRoutes)
 
 app.get('/', async (req, res) => {
   try {

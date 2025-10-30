@@ -182,68 +182,25 @@ export const getScheduleByDate = async (req, res) => {
 
 
 
-const parseAndValidateTrackIdsForSave = (tracksIdsInput) => {
-    let tracksIdsArray = [];
-    let error = null;
-    console.log('Raw tracks_ids received for save:', tracksIdsInput);
-
-    if (tracksIdsInput && typeof tracksIdsInput === 'string') {
-        try {
-            const cleanedString = tracksIdsInput.replace(/\s+/g, '').replace(/,\s*]/, ']');
-            console.log('Cleaned tracks_ids string for save:', cleanedString);
-            tracksIdsArray = JSON.parse(cleanedString);
-            console.log('Successfully parsed tracks_ids for save:', tracksIdsArray);
-            if (!Array.isArray(tracksIdsArray)) {
-                console.warn('Parsed tracks_ids is not an array:', tracksIdsArray);
-                error = 'Formato inválido para lista de músicas.';
-                tracksIdsArray = [];
-            } else {
-                 try {
-                     tracksIdsArray = tracksIdsArray.map(id => Number(id)).filter(id => !isNaN(id));
-                 } catch (numErr) {
-                      console.error('Erro ao converter IDs para número:', numErr);
-                      error = 'Erro interno ao processar IDs de músicas.';
-                      tracksIdsArray = [];
-                 }
-            }
-        } catch (e) {
-            console.error('JSON.parse failed for tracks_ids:', e);
-            error = `Erro ao processar lista de músicas: ${e.message}`;
-            tracksIdsArray = [];
-        }
-    } else if (Array.isArray(tracksIdsInput)) {
-         try {
-             tracksIdsArray = tracksIdsInput.map(id => Number(id)).filter(id => !isNaN(id));
-             if (tracksIdsArray.length !== tracksIdsInput.length) {
-                 console.warn('Alguns IDs (recebidos como array) não puderam ser convertidos para número.');
-                 error = 'Lista de músicas (recebida como array) contém IDs numéricos inválidos.';
-                 tracksIdsArray = [];
-             }
-         } catch (numErr) {
-             console.error('Erro ao converter IDs (recebidos como array) para número:', numErr);
-             error = 'Erro interno ao processar IDs de músicas (recebidos como array).';
-             tracksIdsArray = [];
-         }
-    } else {
-        console.warn('tracks_ids received in unexpected format or missing:', tracksIdsInput);
-        tracksIdsArray = [];
-    }
-
-    return { tracksIdsArray, error };
-};
-
-
-
 export const saveSchedule = async (req, res) => {
-    const { data, schedule, regra_repeticao } = req.body;
-    console.log(`Salvando agendamento para data: ${data}, Regra: ${regra_repeticao}`);
+    const { dates, schedule, regra_repeticao } = req.body;
+    console.log(`Salvando agendamento para datas: ${dates}, Regra: ${regra_repeticao}`);
     console.log('Dados recebidos:', schedule);
 
+
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!data || !dateRegex.test(data)) {
-        console.error(`Data inválida ou ausente ao salvar: ${data}`);
-        return res.status(400).json({ error: 'Data inválida ou ausente. Use YYYY-MM-DD.' });
+    if (!dates || !Array.isArray(dates) || dates.length === 0) {
+        console.error(`Datas inválidas ou ausentes ao salvar: ${dates}`);
+        return res.status(400).json({ error: 'Datas inválidas, ausentes ou formato incorreto.' });
     }
+
+    for (const d of dates) {
+        if (!dateRegex.test(d)) {
+            console.error(`Formato de data inválido no array: ${d}`);
+            return res.status(400).json({ error: `Formato de data inválido (${d}). Use YYYY-MM-DD.` });
+        }
+    }
+
     if (!schedule || typeof schedule !== 'object') {
         console.error(`Payload 'schedule' inválido ou ausente: ${schedule}`);
         return res.status(400).json({ error: 'Dados de agendamento inválidos ou ausentes.' });
@@ -254,22 +211,34 @@ export const saveSchedule = async (req, res) => {
         return res.status(400).json({ error: 'Regra de repetição inválida ou ausente.' });
     }
 
+    if (regra_repeticao === 'DIA_SEMANA_MES' && dates.length > 1) {
+        console.error(`Regra 'DIA_SEMANA_MES' enviada com múltiplos dias.`);
+        return res.status(400).json({ error: 'Regra de repetição mensal só pode ser aplicada a um único dia.' });
+    }
+
+
     const connection = await pool.getConnection();
 
     try {
         await connection.beginTransaction();
 
-        let datesToProcess = [data];
+        let datesToProcess = [];
+
 
         if (regra_repeticao === 'DIA_SEMANA_MES') {
-            const dateObj = new Date(data + 'T00:00:00Z');
+            const singleDate = dates[0];
+            const dateObj = new Date(singleDate + 'T00:00:00Z');
             const year = dateObj.getUTCFullYear();
             const month = dateObj.getUTCMonth() + 1;
             const dayOfWeek = dateObj.getUTCDay();
 
             datesToProcess = getDatesForDayOfWeekInMonth(year, month, dayOfWeek);
             console.log(`Repetição DIA_SEMANA_MES: Processando datas: ${datesToProcess.join(', ')}`);
+        } else {
+            datesToProcess = dates;
+            console.log(`Regra NENHUMA: Processando datas: ${datesToProcess.join(', ')}`);
         }
+
 
         if (datesToProcess.length > 0) {
              const placeholders = datesToProcess.map(() => '?').join(',');
@@ -309,7 +278,7 @@ export const saveSchedule = async (req, res) => {
             );
             console.log(`${inserts.length} novos agendamentos inseridos.`);
         } else {
-             console.log('Nenhum agendamento válido para inserir.');
+             console.log('Nenhum agendamento válido para inserir (grade vazia).');
         }
 
 
@@ -330,6 +299,7 @@ export const saveSchedule = async (req, res) => {
         connection.release();
     }
 };
+
 
 
 export const getScheduleReport = async (req, res) => {

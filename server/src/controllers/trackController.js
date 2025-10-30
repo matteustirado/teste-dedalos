@@ -202,8 +202,8 @@ export const addTrack = async (req, res) => {
   try {
       stringifiedDiasSemana = JSON.stringify(diasSemanaArray);
   } catch (stringifyErr) {
-      console.error("Erro Crítico: Falha ao stringificar diasSemanaArray em addTrack:", stringifyErr);
-      stringifiedDiasSemana = JSON.stringify(ALL_DAYS_ARRAY); // Fallback mais seguro
+     console.error("Erro Crítico: Falha ao stringificar diasSemanaArray em addTrack:", stringifyErr);
+     stringifiedDiasSemana = JSON.stringify(ALL_DAYS_ARRAY);
   }
 
   try {
@@ -237,32 +237,25 @@ export const addTrack = async (req, res) => {
   }
 }
 
-// --- safeJsonParse CORRIGIDA ---
+
 const safeJsonParse = (input) => {
-  // 1. Se já for um array, apenas retorna (assume que o driver já parseou)
   if (Array.isArray(input)) {
-    // Opcional: Validar se os elementos são números, se necessário
-    // return input.map(Number).filter(n => !isNaN(n));
     return input;
   }
 
-  // 2. Se for uma string vazia ou null/undefined, retorna array vazio
   if (!input || typeof input !== 'string') {
     return [];
   }
 
-  // 3. Se for uma string, tenta fazer o parse
   try {
-    // Opcional: Limpeza da string (pode não ser mais necessária se o save estiver correto)
-    // const cleanedString = input.replace(/\s+/g, '').replace(/,\s*]/, ']');
-    const parsed = JSON.parse(input); // Tenta parsear a string original
+    const parsed = JSON.parse(input);
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.error("safeJsonParse - Erro no parse da string:", e, "- String original:", input); // Loga o erro e a string
-    return []; // Retorna array vazio em caso de erro no parse
+    console.error("safeJsonParse - Erro no parse da string:", e, "- String original:", input);
+    return [];
   }
 };
-// --- FIM safeJsonParse CORRIGIDA ---
+
 
 
 export const listTracks = async (req, res) => {
@@ -272,7 +265,7 @@ export const listTracks = async (req, res) => {
     const processedRows = rows.map(track => ({
       ...track,
       artistas_participantes: safeJsonParse(track.artistas_participantes),
-      dias_semana: safeJsonParse(track.dias_semana) // Usa a função corrigida
+      dias_semana: safeJsonParse(track.dias_semana)
     }));
     
     res.json(processedRows);
@@ -302,7 +295,7 @@ export const updateTrack = async (req, res) => {
   let processedAno = null; 
   if (ano !== '' && ano != null) {
      const anoInt = parseInt(ano, 10);
-   if (!isNaN(anoInt)) { processedAno = anoInt; }
+    if (!isNaN(anoInt)) { processedAno = anoInt; }
   }
 
   const diasSemanaArray = (Array.isArray(dias_semana) && dias_semana.length > 0)
@@ -313,8 +306,8 @@ export const updateTrack = async (req, res) => {
   try {
       stringifiedDiasSemana = JSON.stringify(diasSemanaArray);
   } catch (stringifyErr) {
-      console.error("Erro Crítico: Falha ao stringificar diasSemanaArray em updateTrack:", stringifyErr);
-      stringifiedDiasSemana = JSON.stringify(ALL_DAYS_ARRAY);
+     console.error("Erro Crítico: Falha ao stringificar diasSemanaArray em updateTrack:", stringifyErr);
+     stringifiedDiasSemana = JSON.stringify(ALL_DAYS_ARRAY);
   }
 
 
@@ -383,8 +376,8 @@ export const deleteMultipleTracks = async (req, res) => {
     const placeholders = numericIds.map(() => '?').join(',');
     
     const [result] = await connection.query(
-        `DELETE FROM tracks WHERE id IN (${placeholders})`,
-        numericIds
+         `DELETE FROM tracks WHERE id IN (${placeholders})`,
+         numericIds
     );
     
     await connection.commit();
