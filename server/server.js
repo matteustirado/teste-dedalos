@@ -8,6 +8,8 @@ import playlistRoutes from './src/routes/playlistRoutes.js'
 import scheduleRoutes from './src/routes/scheduleRoutes.js'
 import path from 'path' 
 import { fileURLToPath } from 'url'; 
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 dotenv.config()
 
@@ -15,6 +17,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename); 
 
 const app = express()
+const httpServer = createServer(app);
+
+const io = new Server(httpServer, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"]
+  }
+});
+
 const port = process.env.PORT || 4000
 
 app.use(cors())
@@ -38,6 +49,16 @@ app.get('/', async (req, res) => {
   }
 })
 
-app.listen(port, () => {
-  console.log(`Backend rodando na porta ${port}`)
+io.on('connection', (socket) => {
+  console.log(`[Socket.io] Novo cliente conectado: ${socket.id}`);
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket.io] Cliente desconectado: ${socket.id}`);
+  });
+});
+
+httpServer.listen(port, () => {
+  console.log(`Backend rodando (com Socket.io) na porta ${port}`)
 })
+
+export { io };

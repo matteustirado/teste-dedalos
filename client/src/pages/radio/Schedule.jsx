@@ -277,38 +277,35 @@ export default function Schedule() {
        setRepeatRule('NENHUMA');
    };
 
-   const handleConfirmSelection = async () => {
-       if (selectedDates.length === 0) {
-           toast.warn("Por favor, selecione pelo menos um dia.");
-           return;
-       }
-       
-       if (selectedDates.length === 1) {
-           setLoadingSchedule(true);
-           const dateString = formatDateToYYYYMMDD(selectedDates[0]);
-           try {
-               const response = await axios.get(`${API_URL}/api/agendamentos/${dateString}`);
-               setCurrentSchedule(response.data || {});
-           } catch (err) {
-               console.error(`Erro ao buscar agendamento para ${dateString}:`, err);
-               toast.error(`Não foi possível carregar o agendamento.`);
-               setCurrentSchedule({});
-           } finally {
-               setLoadingSchedule(false);
-           }
-       } else {
-           setCurrentSchedule({});
-           setRepeatRule('NENHUMA');
-       }
-       
-       setViewMode('editingGrade');
-   };
+  const handleConfirmSelection = async () => {
+      if (selectedDates.length === 0) {
+          toast.warn("Por favor, selecione pelo menos um dia.");
+          return;
+      }
+      
+      if (selectedDates.length === 1) {
+          setLoadingSchedule(true);
+          const dateString = formatDateToYYYYMMDD(selectedDates[0]);
+          try {
+              const response = await axios.get(`${API_URL}/api/agendamentos/${dateString}`);
+              setCurrentSchedule(response.data || {});
+          } catch (err) {
+              console.error(`Erro ao buscar agendamento para ${dateString}:`, err);
+              toast.error(`Não foi possível carregar o agendamento.`);
+              setCurrentSchedule({});
+          } finally {
+              setLoadingSchedule(false);
+          }
+      } else {
+          setCurrentSchedule({});
+          setRepeatRule('NENHUMA');
+      }
+      
+      setViewMode('editingGrade');
+  };
 
    const handlePlaylistDragStart = (e, playlist) => {
-       const data = JSON.stringify({
-           playlist_id: playlist.id,
-           playlist_nome: playlist.nome,
-       });
+       const data = JSON.stringify({ playlist_id: playlist.id, playlist_nome: playlist.nome });
        e.dataTransfer.setData("playlistData", data);
    };
 
@@ -316,9 +313,9 @@ export default function Schedule() {
         if (selectedDates.length === 0) return;
         try {
             const playlistData = JSON.parse(playlistDataString);
-            if (!playlistData?.playlist_id) throw new Error("Dados da playlist inválidos.");
+            if (!playlistData?.playlist_id) throw new Error("Dados inválidos.");
             const droppedPlaylist = playlists.find(p => p.id === playlistData.playlist_id);
-            if (!droppedPlaylist) throw new Error("Playlist arrastada não encontrada.");
+            if (!droppedPlaylist) throw new Error("Playlist não encontrada.");
             const details = getPlaylistDetails(droppedPlaylist);
             const durationSeconds = calculateDurationStringToSeconds(details.duration);
             if (durationSeconds <= 0) { toast.warn("Duração inválida."); return; }
@@ -333,6 +330,7 @@ export default function Schedule() {
                 }
             }
             if (isOverlapping) return;
+
             const hoursNeeded = Math.ceil(durationSeconds / 3600);
             const endTime = targetHour + hoursNeeded;
             for (let h = targetHour; h < endTime; h++) {
@@ -357,7 +355,7 @@ export default function Schedule() {
             });
         } catch (e) {
             console.error("Erro no drop:", e);
-             toast.error(`Erro ao adicionar playlist: ${e.message}`);
+             toast.error(`Erro: ${e.message}`);
         }
     };
    const handleRemovePlaylistFromHour = (hour) => { setCurrentSchedule(prev => ({ ...prev, [hour]: null })); };
@@ -418,7 +416,7 @@ export default function Schedule() {
 
    
    const tileClassName = ({ date, view }) => {
-       if (view === 'month') {
+       if (view === 'month') { 
            const dateString = formatDateToYYYYMMDD(date);
            if (scheduledDatesInMonth.includes(dateString)) {
                return 'scheduled-day';
@@ -468,10 +466,19 @@ export default function Schedule() {
               <span className="material-symbols-outlined">library_music</span>
               <p className="text-base font-medium">Biblioteca</p>
             </button>
-            <button className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/20 text-primary border border-primary/50">
-              <span className="material-symbols-outlined">calendar_month</span>
-              <p className="text-base font-semibold">Agendamento</p>
-            </button>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/20 border border-primary/50 relative">
+               <button
+                   onClick={() => navigate('/radio/library')}
+                   className="p-2 rounded-md hover:bg-white/10 text-primary"
+                   title="Voltar para Biblioteca"
+               >
+                   <span className="material-symbols-outlined text-lg">arrow_back_ios_new</span>
+               </button>
+               <div className="flex items-center gap-3 px-2 py-1 text-primary flex-1 justify-center">
+                   <span className="material-symbols-outlined">calendar_month</span>
+                   <p className="text-sm font-semibold">Agendamento</p>
+               </div>
+            </div>
           </nav>
         </div>
         <div className="flex flex-col gap-3">

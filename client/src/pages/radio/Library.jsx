@@ -29,7 +29,6 @@ export default function Library() {
   const [playlistToDelete, setPlaylistToDelete] = useState(null);
 
 
-
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -50,7 +49,6 @@ export default function Library() {
     };
     fetchData();
   }, []);
-
 
 
   const getPlaylistDetails = (playlist) => {
@@ -88,15 +86,18 @@ export default function Library() {
     navigate(`/radio/playlist-creator/${playlistId}`);
   };
 
+
   const openDeletePlaylistModal = (playlist) => {
     setPlaylistToDelete(playlist);
     setShowDeleteModal(true);
   };
 
+
   const closeDeletePlaylistModal = () => {
     setPlaylistToDelete(null);
     setShowDeleteModal(false);
   };
+
 
   const confirmDeletePlaylist = async () => {
     if (!playlistToDelete) return;
@@ -147,7 +148,7 @@ export default function Library() {
               <span className="material-symbols-outlined">library_music</span>
               <p className="text-base font-semibold">Biblioteca</p>
             </button>
-             <button onClick={() => navigate('/radio/schedule')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
+            <button onClick={() => navigate('/radio/schedule')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
               <span className="material-symbols-outlined">calendar_month</span>
               <p className="text-base font-medium">Agendamento</p>
             </button>
@@ -220,6 +221,7 @@ export default function Library() {
               const imageUrl = playlist.imagem ? `${API_URL}${playlist.imagem}` : null;
               return (
                 <div key={playlist.id} className="liquid-glass rounded-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300 group">
+                  
                   <div
                     className="h-48 bg-gradient-to-br from-primary/70 to-red-600/70 flex items-center justify-center relative bg-cover bg-center"
                     style={imageUrl ? { backgroundImage: `url(${imageUrl})` } : {}}
@@ -227,6 +229,7 @@ export default function Library() {
                     {!imageUrl && <span className="material-symbols-outlined text-white text-6xl opacity-50">queue_music</span>}
                     <div className={`absolute inset-0 transition-opacity duration-300 ${imageUrl ? 'bg-black/40 group-hover:bg-black/60' : 'bg-black/20'}`}></div>
                   </div>
+                  
                   <div className="p-5">
                     <h3 className="text-lg font-bold text-white mb-1 truncate">{playlist.nome}</h3>
                     <p className="text-sm text-text-muted mb-3 h-10 overflow-hidden line-clamp-2">{playlist.descricao || 'Sem descrição'}</p>
@@ -256,13 +259,14 @@ export default function Library() {
         </div>
       </main>
 
+      
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="liquid-glass rounded-xl p-8 max-w-md w-full mx-4">
             <h3 className="text-xl font-bold text-white mb-4">Confirmar Exclusão</h3>
-            <p className="text-text-muted mb-6">Tem certeza que deseja excluir permanentLmente a playlist "{playlistToDelete?.nome}"?</p>
+            <p className="text-text-muted mb-6">Tem certeza que deseja excluir permanentemente a playlist "{playlistToDelete?.nome}"?</p>
             <div className="flex justify-end gap-4">
-              <button onClick={closeDeletePlaylistModal} className="bg-white/10 text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/20 transition-colors">
+              <button onClick={closeDeleteModal} className="bg-white/10 text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/20 transition-colors">
                 Cancelar
               </button>
               <button onClick={confirmDeletePlaylist} className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors">
