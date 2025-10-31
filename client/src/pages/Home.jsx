@@ -10,6 +10,7 @@ export default function Home() {
     { id: 'collection', name: 'Acervo de Músicas', icon: 'music_video', path: '/radio/collection' },
     { id: 'playlist-creator', name: 'Criar Playlists', icon: 'playlist_add', path: '/radio/playlist-creator' },
     { id: 'library', name: 'Biblioteca', icon: 'library_music', path: '/radio/library' },
+    { id: 'schedule', name: 'Agendamento', icon: 'calendar_month', path: '/radio/schedule' },
     { id: 'go-live', name: 'Ao Vivo', icon: 'sensors', path: null }
   ]
 
@@ -63,7 +64,7 @@ export default function Home() {
             </div>
             
             {expandedSections.radio && (
-              <div className="grid grid-cols-5 gap-4 mt-6 pt-6 border-t border-white/10">
+              <div className="grid grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/10">
                 {radioTools.map((tool) => (
                   <div 
                     key={tool.id} 

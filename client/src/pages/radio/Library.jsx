@@ -55,7 +55,6 @@ export default function Library() {
      if (!allTracks || allTracks.length === 0) {
       return { count: 0, duration: '0m' };
     }
-    
     const trackIds = Array.isArray(playlist.tracks_ids) ? playlist.tracks_ids : [];
     const trackCount = trackIds.length;
     let totalDurationSeconds = 0;
@@ -144,10 +143,12 @@ export default function Library() {
               <span className="material-symbols-outlined">playlist_add</span>
               <p className="text-base font-medium">Criar Playlist</p>
             </button>
+            
             <button className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/20 text-primary border border-primary/50">
               <span className="material-symbols-outlined">library_music</span>
               <p className="text-base font-semibold">Biblioteca</p>
             </button>
+            
             <button onClick={() => navigate('/radio/schedule')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
               <span className="material-symbols-outlined">calendar_month</span>
               <p className="text-base font-medium">Agendamento</p>
@@ -266,7 +267,7 @@ export default function Library() {
             <h3 className="text-xl font-bold text-white mb-4">Confirmar Exclusão</h3>
             <p className="text-text-muted mb-6">Tem certeza que deseja excluir permanentemente a playlist "{playlistToDelete?.nome}"?</p>
             <div className="flex justify-end gap-4">
-              <button onClick={closeDeleteModal} className="bg-white/10 text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/20 transition-colors">
+              <button onClick={closeDeletePlaylistModal} className="bg-white/10 text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/20 transition-colors">
                 Cancelar
               </button>
               <button onClick={confirmDeletePlaylist} className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors">

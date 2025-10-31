@@ -280,6 +280,10 @@ export default function PlaylistCreator() {
              <span className="material-symbols-outlined">library_music</span>
              <p className="text-base font-medium">Biblioteca</p>
            </button>
+           <button onClick={() => navigate('/radio/schedule')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
+             <span className="material-symbols-outlined">calendar_month</span>
+             <p className="text-base font-medium">Agendamento</p>
+           </button>
          </nav>
         </div>
         <div className="flex flex-col gap-3">

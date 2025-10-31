@@ -5,7 +5,6 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { toast } from 'react-toastify';
 
-
 const HourlyScheduleList = ({ scheduleData, onDropPlaylist, onRemovePlaylist, loadingSchedule }) => {
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const [dragOverHour, setDragOverHour] = useState(null);
@@ -119,7 +118,6 @@ const HourlyScheduleList = ({ scheduleData, onDropPlaylist, onRemovePlaylist, lo
 
 const API_URL = 'http://localhost:4000'
 
-
 const formatTotalDuration = (totalSeconds) => {
   if (typeof totalSeconds !== 'number' || totalSeconds <= 0) return '0s';
   const hours = Math.floor(totalSeconds / 3600);
@@ -131,12 +129,11 @@ const formatTotalDuration = (totalSeconds) => {
   return result.trim();
 }
 
-
 const formatDateToYYYYMMDD = (date) => {
     if (!date) return null;
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
 
@@ -152,10 +149,27 @@ const calculateDurationStringToSeconds = (durationString) => {
     return totalSeconds;
  };
 
-const getTodayAtMidnightUTC = () => {
+const getTodayAtMidnightLocal = () => {
     const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
     return today;
+};
+
+const getDatesForDayOfWeekInMonth = (year, month, dayOfWeek) => {
+    const dates = [];
+    const date = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    while (date.getDay() !== dayOfWeek) {
+        date.setDate(date.getDate() + 1);
+        if (date.getMonth() !== month) break;
+    }
+
+    while (date.getMonth() === month && date.getDate() <= daysInMonth) {
+        dates.push(new Date(date.getTime()));
+        date.setDate(date.getDate() + 7);
+    }
+    return dates;
 };
 
 
@@ -166,9 +180,8 @@ export default function Schedule() {
   const [searchTerm, setSearchTerm] = useState('')
   const [loadingPlaylists, setLoadingPlaylists] = useState(true);
 
-
   const [viewMode, setViewMode] = useState('selectingDays');
-  const [selectedDates, setSelectedDates] = useState([getTodayAtMidnightUTC()]);
+  const [selectedDates, setSelectedDates] = useState([getTodayAtMidnightLocal()]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentSchedule, setCurrentSchedule] = useState({});
   const [repeatRule, setRepeatRule] = useState('NENHUMA');
@@ -177,7 +190,6 @@ export default function Schedule() {
   const [activeStartDate, setActiveStartDate] = useState(new Date());
   const [scheduledDatesInMonth, setScheduledDatesInMonth] = useState([]);
   const [loadingMonthSummary, setLoadingMonthSummary] = useState(false);
-
 
   useEffect(() => {
     const fetchData = async () => {
@@ -199,35 +211,14 @@ export default function Schedule() {
     fetchData();
   }, []);
 
-
   useEffect(() => {
-    const fetchSchedule = async () => {
-        const dateString = formatDateToYYYYMMDD(selectedDate);
-        if (!dateString) {
-            setCurrentSchedule({});
-            return;
-        }
-        setLoadingSchedule(true);
-        try {
-            const response = await axios.get(`${API_URL}/api/agendamentos/${dateString}`);
-            setCurrentSchedule(response.data || {});
-        } catch (err) {
-            console.error(`Erro ao buscar agendamento para ${dateString}:`, err);
-            toast.error(`Não foi possível carregar o agendamento para ${selectedDate?.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}.`);
-            setCurrentSchedule({});
-        } finally {
-            setLoadingSchedule(false);
-        }
-    };
-    fetchSchedule();
   }, [selectedDate]);
-
 
   useEffect(() => {
     const fetchMonthSummary = async () => {
         setLoadingMonthSummary(true);
-        const year = activeStartDate.getUTCFullYear();
-        const month = activeStartDate.getUTCMonth() + 1;
+        const year = activeStartDate.getFullYear();
+        const month = activeStartDate.getMonth() + 1;
         try {
             const response = await axios.get(`${API_URL}/api/agendamentos/summary/${year}/${month}`);
             setScheduledDatesInMonth(response.data || []);
@@ -241,7 +232,6 @@ export default function Schedule() {
     const timer = setTimeout(fetchMonthSummary, 100);
     return () => clearTimeout(timer);
   }, [activeStartDate]);
-
 
   const getPlaylistDetails = (playlist) => {
      if (!allTracks || allTracks.length === 0) { return { count: 0, duration: '0m' }; }
@@ -269,12 +259,44 @@ export default function Schedule() {
     return playlists.filter(p => p.nome.toLowerCase().includes(lowerQuery));
   }, [playlists, searchTerm]);
 
-
    const handleDateSelect = (value) => {
        const dates = Array.isArray(value) ? value : [value];
-       dates.forEach(date => date.setUTCHours(0,0,0,0));
-       setSelectedDates(dates);
+       const newDates = dates.map(date => {
+           const newDate = new Date(date);
+           newDate.setHours(0, 0, 0, 0);
+           return newDate;
+       });
+
+       setSelectedDates(newDates);
+       
+       if (newDates.length > 0) {
+           const earliestDate = new Date(Math.min.apply(null, newDates));
+           setOriginalClickedDate(earliestDate);
+       } else {
+           setOriginalClickedDate(null);
+       }
+       
        setRepeatRule('NENHUMA');
+   };
+
+   const handleRepeatToggle = (e) => {
+        const isChecking = e.target.checked;
+        
+        if (isChecking && originalClickedDate) {
+            setRepeatRule('DIA_SEMANA_MES');
+            
+            const firstDate = originalClickedDate;
+            const dates = getDatesForDayOfWeekInMonth(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDay());
+            
+            const futureDates = dates.filter(d => d.getDate() >= firstDate.getDate());
+            
+            setSelectedDates(futureDates);
+        } else {
+            setRepeatRule('NENHUMA');
+            if (originalClickedDate) {
+                 setSelectedDates([originalClickedDate]);
+            }
+        }
    };
 
   const handleConfirmSelection = async () => {
@@ -283,7 +305,7 @@ export default function Schedule() {
           return;
       }
       
-      if (selectedDates.length === 1) {
+      if (selectedDates.length === 1 && repeatRule === 'NENHUMA') {
           setLoadingSchedule(true);
           const dateString = formatDateToYYYYMMDD(selectedDates[0]);
           try {
@@ -298,7 +320,6 @@ export default function Schedule() {
           }
       } else {
           setCurrentSchedule({});
-          setRepeatRule('NENHUMA');
       }
       
       setViewMode('editingGrade');
@@ -376,7 +397,10 @@ export default function Schedule() {
             });
 
            const formattedDates = selectedDates.map(date => formatDateToYYYYMMDD(date));
-           const finalRepeatRule = selectedDates.length === 1 ? repeatRule : 'NENHUMA';
+           
+           const finalRepeatRule = (repeatRule === 'DIA_SEMANA_MES')
+             ? 'DIA_SEMANA_MES'
+             : 'NENHUMA';
 
            await axios.post(`${API_URL}/api/agendamentos`, {
                dates: formattedDates,
@@ -386,14 +410,15 @@ export default function Schedule() {
            
            toast.success('Agendamento salvo com sucesso!');
            
-           const year = activeStartDate.getUTCFullYear();
-           const month = activeStartDate.getUTCMonth() + 1;
+           const year = activeStartDate.getFullYear();
+           const month = activeStartDate.getMonth() + 1;
            const summaryResponse = await axios.get(`${API_URL}/api/agendamentos/summary/${year}/${month}`);
            setScheduledDatesInMonth(summaryResponse.data || []);
            
            if (exitOnSave) {
                setViewMode('selectingDays');
-               setSelectedDates([getTodayAtMidnightUTC()]);
+               setSelectedDates([getTodayAtMidnightLocal()]);
+               setOriginalClickedDate(getTodayAtMidnightLocal());
                setCurrentSchedule({});
                setRepeatRule('NENHUMA');
            }
@@ -429,7 +454,27 @@ export default function Schedule() {
    const showRepeatCheckbox = viewMode === 'selectingDays' && selectedDates.length === 1;
    const showScheduleButton = viewMode === 'selectingDays' && selectedDates.length > 0;
    const isSingleDateSelected = selectedDates.length === 1;
-   const isPastDateSelected = isSingleDateSelected && selectedDates[0] < getTodayAtMidnightUTC();
+   const isPastDateSelected = isSingleDateSelected && selectedDates[0] < getTodayAtMidnightLocal(); 
+
+   const repeatLabel = useMemo(() => {
+        if (!showRepeatCheckbox) {
+            return "";
+        }
+        try {
+            const date = originalClickedDate; 
+            if (!date) return "Repetir dia da semana no mês";
+            
+            const diaSemana = date.toLocaleDateString('pt-BR', { weekday: 'long' });
+            const mes = date.toLocaleDateString('pt-BR', { month: 'long' });
+            
+            const diaSemanaCapitalized = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+            
+            return `Repetir nas próximas ${diaSemanaCapitalized}s do mês de ${mes}`;
+        } catch (e) {
+            console.error("Erro ao formatar data para label:", e);
+            return "Repetir dia da semana no mês";
+        }
+    }, [originalClickedDate, showRepeatCheckbox]);
 
 
   return (
@@ -456,7 +501,7 @@ export default function Schedule() {
             </button>
             <button onClick={() => navigate('/radio/collection')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
               <span className="material-symbols-outlined">music_video</span>
-              <p className="text-base font-medium">Acervo</p>
+              <p className="text-base font-medium">Acervo de Músicas</p>
             </button>
             <button onClick={() => navigate('/radio/playlist-creator')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
               <span className="material-symbols-outlined">playlist_add</span>
@@ -573,11 +618,11 @@ export default function Schedule() {
                                        type="checkbox"
                                        id="repeat-schedule"
                                        checked={repeatRule === 'DIA_SEMANA_MES'}
-                                       onChange={(e) => setRepeatRule(e.target.checked ? 'DIA_SEMANA_MES' : 'NENHUMA')}
+                                       onChange={handleRepeatToggle}
                                        className="w-4 h-4 rounded bg-white/20 border-white/30 text-primary focus:ring-primary"
                                    />
                                    <label htmlFor="repeat-schedule" className="text-sm font-medium text-white">
-                                        Repetir dia da semana no mês
+                                        {repeatLabel}
                                    </label>
                                </div>
                            )}
@@ -595,7 +640,7 @@ export default function Schedule() {
                                    onClick={handleConfirmSelection}
                                    className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/80 transition-colors"
                                >
-                                   Agendar para {selectedDates.length} dia(s)
+                                   Gerenciar Agendamento
                                </button>
                            )}
                        </div>
@@ -615,7 +660,12 @@ export default function Schedule() {
                                  </p>
                              </div>
                              <button
-                                onClick={() => { setViewMode('selectingDays'); setCurrentSchedule({}); }}
+                                onClick={() => { 
+                                    setViewMode('selectingDays'); 
+                                    setCurrentSchedule({}); 
+                                    setRepeatRule('NENHUMA');
+                                    setSelectedDates([originalClickedDate || getTodayAtMidnightLocal()]);
+                                 }}
                                 className="bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/20 transition-colors"
                              >
                                  Mudar Seleção
