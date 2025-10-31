@@ -5,6 +5,7 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { toast } from 'react-toastify';
 
+
 const HourlyScheduleList = ({ scheduleData, onDropPlaylist, onRemovePlaylist, loadingSchedule }) => {
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const [dragOverHour, setDragOverHour] = useState(null);
@@ -118,6 +119,7 @@ const HourlyScheduleList = ({ scheduleData, onDropPlaylist, onRemovePlaylist, lo
 
 const API_URL = 'http://localhost:4000'
 
+
 const formatTotalDuration = (totalSeconds) => {
   if (typeof totalSeconds !== 'number' || totalSeconds <= 0) return '0s';
   const hours = Math.floor(totalSeconds / 3600);
@@ -131,9 +133,9 @@ const formatTotalDuration = (totalSeconds) => {
 
 const formatDateToYYYYMMDD = (date) => {
     if (!date) return null;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear(); 
+    const month = String(date.getMonth() + 1).padStart(2, '0'); 
+    const day = String(date.getDate()).padStart(2, '0'); 
     return `${year}-${month}-${day}`;
 }
 
@@ -149,24 +151,29 @@ const calculateDurationStringToSeconds = (durationString) => {
     return totalSeconds;
  };
 
+// *** CORREÇÃO: Usar meia-noite LOCAL ***
 const getTodayAtMidnightLocal = () => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0); // Usar setHours para meia-noite local
     return today;
 };
 
+// *** NOVA FUNÇÃO (LADO DO CLIENTE) ***
+// Retorna todas as datas locais para um dia da semana específico (0=Dom, 1=Seg) dentro de um mês/ano
 const getDatesForDayOfWeekInMonth = (year, month, dayOfWeek) => {
     const dates = [];
-    const date = new Date(year, month, 1);
+    const date = new Date(year, month, 1); // Começa no primeiro dia do mês (local)
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+    // Encontra o primeiro dia da semana correto
     while (date.getDay() !== dayOfWeek) {
         date.setDate(date.getDate() + 1);
-        if (date.getMonth() !== month) break;
+        if (date.getMonth() !== month) break; // Sai se pular para o próximo mês
     }
 
+    // Adiciona o primeiro e todos os subsequentes
     while (date.getMonth() === month && date.getDate() <= daysInMonth) {
-        dates.push(new Date(date.getTime()));
+        dates.push(new Date(date.getTime())); // Adiciona uma cópia da data
         date.setDate(date.getDate() + 7);
     }
     return dates;
@@ -180,9 +187,11 @@ export default function Schedule() {
   const [searchTerm, setSearchTerm] = useState('')
   const [loadingPlaylists, setLoadingPlaylists] = useState(true);
 
+  // *** NOVO ESTADO: Armazena a data que o usuário clicou originalmente ***
+  const [originalClickedDate, setOriginalClickedDate] = useState(getTodayAtMidnightLocal());
   const [viewMode, setViewMode] = useState('selectingDays');
+  // *** CORREÇÃO: Usar a nova função de data local ***
   const [selectedDates, setSelectedDates] = useState([getTodayAtMidnightLocal()]);
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentSchedule, setCurrentSchedule] = useState({});
   const [repeatRule, setRepeatRule] = useState('NENHUMA');
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -190,6 +199,7 @@ export default function Schedule() {
   const [activeStartDate, setActiveStartDate] = useState(new Date());
   const [scheduledDatesInMonth, setScheduledDatesInMonth] = useState([]);
   const [loadingMonthSummary, setLoadingMonthSummary] = useState(false);
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -211,14 +221,16 @@ export default function Schedule() {
     fetchData();
   }, []);
 
-  useEffect(() => {
-  }, [selectedDate]);
 
   useEffect(() => {
+    // Para garantir que a busca do summary use o mês local
+    const queryDate = new Date(activeStartDate.getTime());
+    queryDate.setDate(15); 
+
     const fetchMonthSummary = async () => {
         setLoadingMonthSummary(true);
-        const year = activeStartDate.getFullYear();
-        const month = activeStartDate.getMonth() + 1;
+        const year = queryDate.getFullYear(); // Usar getFullYear (local)
+        const month = queryDate.getMonth() + 1; // Usar getMonth (local)
         try {
             const response = await axios.get(`${API_URL}/api/agendamentos/summary/${year}/${month}`);
             setScheduledDatesInMonth(response.data || []);
@@ -232,6 +244,7 @@ export default function Schedule() {
     const timer = setTimeout(fetchMonthSummary, 100);
     return () => clearTimeout(timer);
   }, [activeStartDate]);
+
 
   const getPlaylistDetails = (playlist) => {
      if (!allTracks || allTracks.length === 0) { return { count: 0, duration: '0m' }; }
@@ -259,40 +272,52 @@ export default function Schedule() {
     return playlists.filter(p => p.nome.toLowerCase().includes(lowerQuery));
   }, [playlists, searchTerm]);
 
+
    const handleDateSelect = (value) => {
+       // `value` do react-calendar é um array de datas (Date[]) quando selectMultiple={true}
        const dates = Array.isArray(value) ? value : [value];
+       
+       // *** CORREÇÃO 1: Criar NOVOS objetos Date e usar setHours (local) ***
        const newDates = dates.map(date => {
-           const newDate = new Date(date);
-           newDate.setHours(0, 0, 0, 0);
+           const newDate = new Date(date); // Cria uma nova instância
+           newDate.setHours(0, 0, 0, 0); // Modifica a nova instância para meia-noite LOCAL
            return newDate;
        });
 
-       setSelectedDates(newDates);
+       setSelectedDates(newDates); // Define o estado com o novo array
        
+       // Armazena a data original que o usuário clicou (a primeira da lista)
        if (newDates.length > 0) {
+           // Encontra a data mais antiga na seleção (caso o usuário arraste)
            const earliestDate = new Date(Math.min.apply(null, newDates));
            setOriginalClickedDate(earliestDate);
        } else {
            setOriginalClickedDate(null);
        }
        
-       setRepeatRule('NENHUMA');
+       setRepeatRule('NENHUMA'); // Reseta a regra de repetição ao mudar a data manualmente
    };
 
+   // *** NOVA FUNÇÃO: Lógica do Checkbox ***
    const handleRepeatToggle = (e) => {
         const isChecking = e.target.checked;
         
         if (isChecking && originalClickedDate) {
+            // Usuário está marcando o checkbox
             setRepeatRule('DIA_SEMANA_MES');
             
             const firstDate = originalClickedDate;
             const dates = getDatesForDayOfWeekInMonth(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDay());
             
+            // Filtra para incluir apenas a data original e as datas futuras nesse mês
+            // (Ex: Se clicou no dia 12, seleciona 12, 19, 26)
             const futureDates = dates.filter(d => d.getDate() >= firstDate.getDate());
             
-            setSelectedDates(futureDates);
+            setSelectedDates(futureDates); // Atualiza o estado, o calendário vai refletir isso
         } else {
+            // Usuário está desmarcando o checkbox
             setRepeatRule('NENHUMA');
+            // Reverte a seleção para apenas a data que ele clicou originalmente
             if (originalClickedDate) {
                  setSelectedDates([originalClickedDate]);
             }
@@ -396,8 +421,10 @@ export default function Schedule() {
                 }
             });
 
+           // Usa as datas locais (que estão corretas) para gerar as strings YYYY-MM-DD
            const formattedDates = selectedDates.map(date => formatDateToYYYYMMDD(date));
            
+           // A regra de repetição só é válida se o checkbox estiver marcado
            const finalRepeatRule = (repeatRule === 'DIA_SEMANA_MES')
              ? 'DIA_SEMANA_MES'
              : 'NENHUMA';
@@ -417,7 +444,7 @@ export default function Schedule() {
            
            if (exitOnSave) {
                setViewMode('selectingDays');
-               setSelectedDates([getTodayAtMidnightLocal()]);
+               setSelectedDates([getTodayAtMidnightLocal()]); // CORREÇÃO: Usar data local
                setOriginalClickedDate(getTodayAtMidnightLocal());
                setCurrentSchedule({});
                setRepeatRule('NENHUMA');
@@ -431,7 +458,10 @@ export default function Schedule() {
    };
 
    const handleDownloadReport = () => {
-       if (selectedDates.length !== 1) return;
+       if (selectedDates.length !== 1) {
+           toast.warn("Gere relatórios para um único dia.");
+           return;
+       }
        const dateString = formatDateToYYYYMMDD(selectedDates[0]);
        window.open(`${API_URL}/api/agendamentos/relatorio/${dateString}`, '_blank');
    };
@@ -442,6 +472,7 @@ export default function Schedule() {
    
    const tileClassName = ({ date, view }) => {
        if (view === 'month') { 
+           // Compara a data local do calendário com as datas no summary (que são strings YYYY-MM-DD)
            const dateString = formatDateToYYYYMMDD(date);
            if (scheduledDatesInMonth.includes(dateString)) {
                return 'scheduled-day';
@@ -462,7 +493,7 @@ export default function Schedule() {
         }
         try {
             const date = originalClickedDate; 
-            if (!date) return "Repetir dia da semana no mês";
+            if (!date) return "Repetir dia da semana no mês"; 
             
             const diaSemana = date.toLocaleDateString('pt-BR', { weekday: 'long' });
             const mes = date.toLocaleDateString('pt-BR', { month: 'long' });
@@ -472,7 +503,7 @@ export default function Schedule() {
             return `Repetir nas próximas ${diaSemanaCapitalized}s do mês de ${mes}`;
         } catch (e) {
             console.error("Erro ao formatar data para label:", e);
-            return "Repetir dia da semana no mês";
+            return "Repetir dia da semana no mês"; // Fallback
         }
     }, [originalClickedDate, showRepeatCheckbox]);
 
@@ -511,19 +542,10 @@ export default function Schedule() {
               <span className="material-symbols-outlined">library_music</span>
               <p className="text-base font-medium">Biblioteca</p>
             </button>
-            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/20 border border-primary/50 relative">
-               <button
-                   onClick={() => navigate('/radio/library')}
-                   className="p-2 rounded-md hover:bg-white/10 text-primary"
-                   title="Voltar para Biblioteca"
-               >
-                   <span className="material-symbols-outlined text-lg">arrow_back_ios_new</span>
-               </button>
-               <div className="flex items-center gap-3 px-2 py-1 text-primary flex-1 justify-center">
-                   <span className="material-symbols-outlined">calendar_month</span>
-                   <p className="text-sm font-semibold">Agendamento</p>
-               </div>
-            </div>
+            <button className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/20 text-primary border border-primary/50">
+              <span className="material-symbols-outlined">calendar_month</span>
+              <p className="text-base font-semibold">Agendamento</p>
+            </button>
           </nav>
         </div>
         <div className="flex flex-col gap-3">
@@ -538,14 +560,7 @@ export default function Schedule() {
 
       <main className="ml-64 flex-1 p-8">
         <div className="max-w-7xl mx-auto w-full">
-           <button
-               onClick={() => navigate('/radio/library')}
-               className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 mb-4"
-           >
-               <span className="material-symbols-outlined text-lg">arrow_back_ios_new</span>
-               Voltar para Biblioteca
-           </button>
-
+           
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-3xl font-bold text-white mb-1">Agendamento</h1>
@@ -618,9 +633,11 @@ export default function Schedule() {
                                        type="checkbox"
                                        id="repeat-schedule"
                                        checked={repeatRule === 'DIA_SEMANA_MES'}
+                                       // *** CORREÇÃO: Usar o novo handler ***
                                        onChange={handleRepeatToggle}
                                        className="w-4 h-4 rounded bg-white/20 border-white/30 text-primary focus:ring-primary"
                                    />
+                                   {/* *** CORREÇÃO: Usar o label dinâmico *** */}
                                    <label htmlFor="repeat-schedule" className="text-sm font-medium text-white">
                                         {repeatLabel}
                                    </label>
@@ -640,6 +657,7 @@ export default function Schedule() {
                                    onClick={handleConfirmSelection}
                                    className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/80 transition-colors"
                                >
+                                   {/* *** CORREÇÃO: Alteração do texto do botão *** */}
                                    Gerenciar Agendamento
                                </button>
                            )}
@@ -654,7 +672,7 @@ export default function Schedule() {
                                  <h3 className="text-lg font-bold text-white">Editando Grade para:</h3>
                                  <p className="text-sm text-text-muted">
                                      {selectedDates.length === 1
-                                       ? selectedDates[0].toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+                                       ? selectedDates[0].toLocaleDateString('pt-BR', { timeZone: 'UTC' }) // API espera YYYY-MM-DD (gerado a partir do UTC)
                                        : `${selectedDates.length} dias selecionados`}
                                      {repeatRule === 'DIA_SEMANA_MES' && " (Repetindo no mês)"}
                                  </p>
@@ -664,8 +682,9 @@ export default function Schedule() {
                                     setViewMode('selectingDays'); 
                                     setCurrentSchedule({}); 
                                     setRepeatRule('NENHUMA');
+                                    // Reseta a seleção de volta para o dia original clicado
                                     setSelectedDates([originalClickedDate || getTodayAtMidnightLocal()]);
-                                 }}
+                                }}
                                 className="bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/20 transition-colors"
                              >
                                  Mudar Seleção
@@ -682,7 +701,7 @@ export default function Schedule() {
                              </button>
                              <button
                                  onClick={() => handleSaveSchedule(false)}
-                                 disabled={savingSchedule || loadingSchedule}
+                                 disabled={savingSchedule || savingSchedule}
                                  className="bg-primary/70 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-primary/80 transition-colors disabled:opacity-50"
                              >
                                  {savingSchedule ? 'Salvando...' : 'Salvar'}
