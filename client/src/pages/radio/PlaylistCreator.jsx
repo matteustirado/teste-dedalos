@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify';
+import Sidebar from '../../components/Sidebar';
 
 const API_URL = 'http://localhost:4000'
 const WEEK_DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
@@ -13,6 +14,7 @@ export default function PlaylistCreator() {
   const { playlistId } = useParams();
   const isEditMode = Boolean(playlistId);
 
+  // --- ESTADOS GERAIS ---
   const [searchTerm, setSearchTerm] = useState('')
   const [newPlaylist, setNewPlaylist] = useState({
     name: '',
@@ -26,9 +28,11 @@ export default function PlaylistCreator() {
   const [playlistTracks, setPlaylistTracks] = useState([])
   const [allTracksForLookup, setAllTracksForLookup] = useState([])
   const [draggedTrack, setDraggedTrack] = useState(null)
-  const [isLive, setIsLive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [selectedDayFilter, setSelectedDayFilter] = useState(ALL_DAYS_CODE)
+
+  // --- ESTADO DO FILTRO DA PLAYLIST ---
+  const [playlistFilter, setPlaylistFilter] = useState('');
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -94,7 +98,6 @@ export default function PlaylistCreator() {
   const addTrack = (track) => {
     const recentTracks = playlistTracks.slice(-5);
     const isRecentDuplicate = recentTracks.some(t => t.id === track.id);
-    
     if (isRecentDuplicate) {
         toast.info(`"${track.titulo}" foi adicionada recentemente.`);
     }
@@ -105,9 +108,27 @@ export default function PlaylistCreator() {
     setPlaylistTracks(playlistTracks.filter((_, index) => index !== indexToRemove))
   }
 
+  const handleShuffle = () => {
+    if (playlistTracks.length < 2) return;
+    setPlaylistTracks(prevTracks => {
+        const newArr = [...prevTracks];
+        for (let i = newArr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+        }
+        return newArr;
+    });
+    toast.success("Ordem da playlist embaralhada!");
+  };
+
   const handleDragStart = (track, index) => { setDraggedTrack({ ...track, originalIndex: index }) }
   const handleDragOver = (e) => { e.preventDefault() }
+  
   const handleDrop = (targetIndex) => {
+    if (playlistFilter) {
+        toast.warn("Limpe o filtro para reordenar músicas.");
+        return;
+    }
     if (!draggedTrack || draggedTrack.originalIndex === targetIndex) { setDraggedTrack(null); return; }
 
     const newTracks = [...playlistTracks]
@@ -182,12 +203,12 @@ export default function PlaylistCreator() {
       }
       if (exitOnSave) { navigate('/radio/library'); }
       else if (!isEditMode && newId) {
-         navigate(`/radio/playlist-creator/${newId}`, { replace: true });
-         setOriginalCover(newCoverUrl || null);
-         setNewPlaylist(prev => ({...prev, cover: newCoverUrl || null, coverFile: null}));
+        navigate(`/radio/playlist-creator/${newId}`, { replace: true });
+        setOriginalCover(newCoverUrl || null);
+        setNewPlaylist(prev => ({...prev, cover: newCoverUrl || null, coverFile: null}));
       } else if (isEditMode) {
-         setOriginalCover(newCoverUrl || null);
-         setNewPlaylist(prev => ({...prev, cover: newCoverUrl || null, coverFile: null}));
+        setOriginalCover(newCoverUrl || null);
+        setNewPlaylist(prev => ({...prev, cover: newCoverUrl || null, coverFile: null}));
       }
     } catch (err) {
       console.error("Erro ao salvar/atualizar playlist", err);
@@ -219,6 +240,15 @@ export default function PlaylistCreator() {
     });
   }, [allTracksForLookup, selectedDayFilter, searchTerm]);
 
+  const filteredPlaylistTracks = useMemo(() => {
+      const tracksWithIndex = playlistTracks.map((t, i) => ({ ...t, _origIndex: i }));
+      if (!playlistFilter) return tracksWithIndex;
+      const lower = playlistFilter.toLowerCase();
+      return tracksWithIndex.filter(track => 
+          track.titulo.toLowerCase().includes(lower) || 
+          (track.artista && track.artista.toLowerCase().includes(lower))
+      );
+  }, [playlistTracks, playlistFilter]);
    
    const getCoverImageUrl = () => {
      if (newPlaylist.coverFile && newPlaylist.cover?.startsWith('blob:')) { return newPlaylist.cover; }
@@ -229,75 +259,16 @@ export default function PlaylistCreator() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-warm">
-      <aside className="fixed left-0 top-0 h-screen w-64 bg-bg-dark-primary/50 backdrop-blur-sm border-r border-white/10 p-4 flex flex-col justify-between z-10">
-        <div className="flex flex-col gap-8">
-         <div className="flex items-center gap-3">
-           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-red-600 flex items-center justify-center">
-             <span className="material-symbols-outlined text-white text-2xl">playlist_add</span>
-           </div>
-           <div className="flex flex-col">
-             <h1 className="text-white text-lg font-bold leading-tight">{isEditMode ? 'Editar Playlist' : 'Criar Playlist'}</h1>
-             <p className="text-text-muted text-sm">Rádio Dedalos</p>
-           </div>
-         </div>
-         <nav className="flex flex-col gap-2">
-           <button onClick={() => navigate('/')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-             <span className="material-symbols-outlined">home</span>
-             <p className="text-base font-medium">Home</p>
-           </button>
-           <button onClick={() => navigate('/radio/dj')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-             <span className="material-symbols-outlined">radio</span>
-             <p className="text-base font-medium">Painel do DJ</p>
-           </button>
-           <button onClick={() => navigate('/radio/collection')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-             <span className="material-symbols-outlined">music_video</span>
-             <p className="text-base font-medium">Acervo de Músicas</p>
-           </button>
+    <div className="min-h-screen bg-gradient-warm flex">
+      <Sidebar 
+        activePage="playlist-creator" 
+        headerTitle={isEditMode ? 'Editar Playlist' : 'Criar Playlist'} 
+        headerIcon="playlist_add" 
+        isEditMode={isEditMode}
+      />
 
-           {isEditMode ? (
-               <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/20 border border-primary/50 relative">
-                 <button
-                   onClick={() => navigate('/radio/playlist-creator')}
-                   className="p-2 rounded-md hover:bg-white/10 text-primary"
-                   title="Voltar para Criação"
-                 >
-                   <span className="material-symbols-outlined text-lg">arrow_back_ios_new</span>
-                 </button>
-                 <div className="flex items-center gap-3 px-2 py-1 text-primary flex-1 justify-center">
-                   <span className="material-symbols-outlined">playlist_add</span>
-                    <p className="text-sm font-semibold">Editando Playlist</p>
-                 </div>
-               </div>
-           ) : (
-               <button className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/20 text-primary border border-primary/50">
-                   <span className="material-symbols-outlined">playlist_add</span>
-                   <p className="text-base font-semibold">Criar Playlist</p>
-               </button>
-           )}
-
-           <button onClick={() => navigate('/radio/library')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-             <span className="material-symbols-outlined">library_music</span>
-             <p className="text-base font-medium">Biblioteca</p>
-           </button>
-           <button onClick={() => navigate('/radio/schedule')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-             <span className="material-symbols-outlined">calendar_month</span>
-             <p className="text-base font-medium">Agendamento</p>
-           </button>
-         </nav>
-        </div>
-        <div className="flex flex-col gap-3">
-           <button disabled className="flex w-full items-center justify-center rounded-lg h-12 px-4 text-white text-base font-bold bg-gray-600 cursor-not-allowed opacity-50">
-             <span className="truncate">Ao Vivo</span>
-           </button>
-           <div className="text-center text-xs text-text-muted pb-2">
-             <p>© Developed by: <span className="text-primary font-semibold">Matteus Tirado</span></p>
-           </div>
-        </div>
-      </aside>
-
-      <main className="ml-64 p-8">
-        <div className="max-w-7xl mx-auto">
+      <main className="ml-64 flex-1 p-8">
+        <div className="max-w-7xl mx-auto w-full">
           {isEditMode && (
              <button
                onClick={() => navigate('/radio/playlist-creator')}
@@ -354,6 +325,8 @@ export default function PlaylistCreator() {
           {!loading && (
             <>
                <div className="grid grid-cols-2 gap-6 mb-6 items-start">
+                 
+                 {/* COLUNA ESQUERDA: ACERVO */}
                  <div className="liquid-glass rounded-xl p-6 flex flex-col">
                      <h2 className="text-xl font-bold text-white mb-4">Todas as Músicas</h2>
                      <div className="flex gap-2 items-center mb-4 flex-wrap"> 
@@ -381,7 +354,7 @@ export default function PlaylistCreator() {
                          placeholder="Buscar no acervo..."
                          value={searchTerm}
                          onChange={(e) => setSearchTerm(e.target.value)}
-                         className="w-full bg-white/10 border border-white/20 rounded-lg pl-9 pr-4 py-2 text-white text-sm placeholder:text-text-muted focus:ring-2 focus:ring-primary"
+                         className="w-full h-10 bg-white/10 border border-white/20 rounded-lg pl-9 pr-4 text-white text-sm placeholder:text-text-muted focus:ring-2 focus:ring-primary flex items-center"
                          disabled={loading}
                        />
                     </div>
@@ -398,9 +371,9 @@ export default function PlaylistCreator() {
                                 <img src={track.thumbnail_url} alt="Thumbnail" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-white/10" loading="lazy" />
                            ) : (
                                <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/10">
-                                   <span className="material-symbols-outlined text-text-muted text-base">
-                                     {track.is_commercial ? 'campaign' : 'music_note'}
-                                   </span>
+                                    <span className="material-symbols-outlined text-text-muted text-base">
+                                      {track.is_commercial ? 'campaign' : 'music_note'}
+                                    </span>
                                </div>
                            )}
                            <div className="flex-1 min-w-0">
@@ -416,53 +389,125 @@ export default function PlaylistCreator() {
                    </div>
                  </div>
 
+                 {/* COLUNA DIREITA: PLAYLIST ATUAL */}
                  <div className="liquid-glass rounded-xl p-6 flex flex-col">
+                   
+                   {/* LINHA 1: Título e Estatísticas */}
                    <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-white">Músicas da Playlist</h2>
-                    <div className={`text-sm text-right ${getTotalDurationSeconds > DURATION_WARNING_SECONDS ? 'text-yellow-400' : 'text-text-muted'}`}>
-                       <span className="font-semibold">{playlistTracks.length}</span> músicas<br/>
-                       <span className="font-semibold">{formatTotalDuration(getTotalDurationSeconds)}</span>
-                       {getTotalDurationSeconds > DURATION_WARNING_SECONDS && (
-                            <span className="material-symbols-outlined text-base align-middle ml-1" title="Duração da playlist excede 24 horas!">warning</span>
-                       )}
-                    </div>
+                        <h2 className="text-xl font-bold text-white">Músicas da Playlist</h2>
+                        <div className={`text-sm ${getTotalDurationSeconds > DURATION_WARNING_SECONDS ? 'text-yellow-400' : 'text-text-muted'}`}>
+                            <span className="font-semibold">{playlistTracks.length}</span> músicas • <span className="font-semibold">{formatTotalDuration(getTotalDurationSeconds)}</span>
+                            {getTotalDurationSeconds > DURATION_WARNING_SECONDS && (
+                                <span className="material-symbols-outlined text-base align-middle ml-1" title="Duração da playlist excede 24 horas!">warning</span>
+                            )}
+                        </div>
                    </div>
+
+                   {/* LINHA 2: Botões de Ação (ALINHADO COM A ESQUERDA: mb-4) */}
+                   <div className="flex justify-between items-center mb-4">
+                        <button 
+                            onClick={handleShuffle}
+                            className="h-8 px-3 rounded font-semibold text-xs bg-white/5 hover:bg-primary/20 text-text-muted hover:text-primary transition-all border border-white/10 flex items-center gap-2"
+                            title="Embaralhar Músicas"
+                        >
+                            <span className="material-symbols-outlined text-base">shuffle</span>
+                            SHUFFLE
+                        </button>
+
+                        {playlistTracks.length > 0 && (
+                            <button 
+                                onClick={clearPlaylistTracks} 
+                                disabled={loading || playlistFilter}
+                                className="h-8 px-3 rounded font-semibold text-xs bg-white/5 hover:bg-red-500/20 text-text-muted hover:text-red-400 transition-all border border-white/10 disabled:opacity-50"
+                            >
+                                LIMPAR
+                            </button>
+                        )}
+                   </div>
+
+                   {/* LINHA 3: Campo de Busca da Playlist (Padronizado h-10) */}
+                   <div className="relative mb-4">
+                       <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-lg">search</span>
+                       <input
+                           type="text"
+                           placeholder="Filtrar na playlist..."
+                           value={playlistFilter}
+                           onChange={(e) => setPlaylistFilter(e.target.value)}
+                           className="w-full h-10 bg-white/10 border border-white/20 rounded-lg pl-9 pr-8 text-white text-sm placeholder:text-text-muted focus:ring-2 focus:ring-primary flex items-center"
+                       />
+                       {playlistFilter && (
+                           <button 
+                               onClick={() => setPlaylistFilter('')}
+                               className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white"
+                           >
+                               <span className="material-symbols-outlined text-sm">close</span>
+                           </button>
+                       )}
+                   </div>
+
+                   {/* LISTA DE MÚSICAS */}
                   <div className="flex-1 overflow-y-auto space-y-2 pr-2 -mr-2 max-h-[500px]">
                     {playlistTracks.length === 0 && <p className="text-text-muted text-center text-sm">Arraste ou clique nas músicas à esquerda para adicionar.</p>}
-                    {playlistTracks.map((track, index) => {
-                       const isClose = checkProximity(index);
+                    
+                    {playlistTracks.length > 0 && filteredPlaylistTracks.length === 0 && (
+                        <p className="text-text-muted text-center text-sm py-4">Nenhuma música encontrada com este filtro.</p>
+                    )}
+
+                    {filteredPlaylistTracks.map((track, index) => {
+                       const originalIndex = track._origIndex; 
+                       const isClose = checkProximity(originalIndex);
+                       
                        return (
                            <div
-                             key={`${track.id}-${index}`}
-                             draggable
-                             onDragStart={() => handleDragStart(track, index)}
+                             key={`${track.id}-${originalIndex}`}
+                             draggable={!playlistFilter}
+                             onDragStart={() => !playlistFilter && handleDragStart(track, originalIndex)}
                              onDragOver={handleDragOver}
-                             onDrop={() => handleDrop(index)}
-                             className={`flex items-center gap-3 p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-move group relative ${draggedTrack?.originalIndex === index ? 'opacity-30' : ''}`}
+                             onDrop={() => !playlistFilter && handleDrop(originalIndex)}
+                             className={`flex items-center gap-3 p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors group relative 
+                                ${draggedTrack?.originalIndex === originalIndex ? 'opacity-30' : ''}
+                                ${!playlistFilter ? 'cursor-move' : ''}
+                             `}
                            >
                              {isClose && (
                                <span className="material-symbols-outlined text-yellow-400 text-base absolute -left-1 -top-1" title="Música tocada nas últimas 5 faixas">warning</span>
                              )}
-                             <span className="material-symbols-outlined text-text-muted text-lg cursor-grab flex-shrink-0">drag_indicator</span>
+                             
+                             {!playlistFilter ? (
+                                <span className="material-symbols-outlined text-text-muted text-lg cursor-grab flex-shrink-0">drag_indicator</span>
+                             ) : (
+                                <span className="text-text-muted text-xs w-4 text-center">•</span>
+                             )}
+
                              {track.thumbnail_url ? (
                                   <img src={track.thumbnail_url} alt="Thumbnail" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-white/10" loading="lazy" />
                              ) : (
-                                 <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/10">
-                                      <span className="material-symbols-outlined text-text-muted text-base">
-                                        {track.is_commercial ? 'campaign' : 'music_note'}
-                                      </span>
-                                 </div>
+                                  <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/10">
+                                       <span className="material-symbols-outlined text-text-muted text-base">
+                                         {track.is_commercial ? 'campaign' : 'music_note'}
+                                       </span>
+                                  </div>
                              )}
-                             <span className="text-text-muted font-mono text-sm w-6 text-right flex-shrink-0">{index + 1}</span>
+                             
+                             <span className="text-text-muted font-mono text-sm w-6 text-right flex-shrink-0">
+                                 {playlistFilter ? '' : originalIndex + 1}
+                             </span>
+
                              <div className="flex-1 min-w-0">
                                <p className="text-white font-semibold text-sm truncate">{track.titulo}</p>
                                <p className="text-text-muted text-xs truncate">{track.artista}</p>
                              </div>
+                             
                              <span className="text-text-muted text-xs flex-shrink-0 ml-2">
                                {formatDuration(track.end_segundos ? track.end_segundos - track.start_segundos : track.duracao_segundos - track.start_segundos)}
                              </span>
+                             
                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                               <button onClick={() => removeTrack(index)} className="p-1 hover:bg-red-500/20 rounded-lg">
+                               <button 
+                                    onClick={() => removeTrack(originalIndex)}
+                                    className="p-1 hover:bg-red-500/20 rounded-lg"
+                                    title="Remover da Playlist"
+                               >
                                  <span className="material-symbols-outlined text-red-500 text-base">delete</span>
                                </button>
                              </div>
@@ -470,11 +515,6 @@ export default function PlaylistCreator() {
                          )
                        })}
                    </div>
-                   {playlistTracks.length > 0 && (
-                       <button onClick={clearPlaylistTracks} disabled={loading} className="mt-4 w-full bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/20 transition-colors disabled:opacity-50">
-                         Limpar Lista
-                       </button>
-                   )}
                  </div>
                </div>
 

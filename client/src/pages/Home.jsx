@@ -11,7 +11,8 @@ export default function Home() {
     { id: 'playlist-creator', name: 'Criar Playlists', icon: 'playlist_add', path: '/radio/playlist-creator' },
     { id: 'library', name: 'Biblioteca', icon: 'library_music', path: '/radio/library' },
     { id: 'schedule', name: 'Agendamento', icon: 'calendar_month', path: '/radio/schedule' },
-    { id: 'go-live', name: 'Ao Vivo', icon: 'sensors', path: null }
+    // Alterado path para null e adicionada lógica no click
+    { id: 'go-live', name: 'Ao Vivo', icon: 'sensors', path: 'EXTERNAL_WATCH' }
   ]
 
   const toggleSection = (section) => {
@@ -19,7 +20,9 @@ export default function Home() {
   }
 
   const handleToolClick = (path) => {
-    if (path) {
+    if (path === 'EXTERNAL_WATCH') {
+        window.open('/radio/watch', '_blank');
+    } else if (path) {
       navigate(path)
     }
   }
@@ -69,9 +72,9 @@ export default function Home() {
                   <div 
                     key={tool.id} 
                     onClick={() => handleToolClick(tool.path)} 
-                    className={`liquid-glass rounded-xl p-6 transform transition-all duration-300 hover:shadow-2xl group ${tool.path ? 'cursor-pointer hover:scale-105' : 'cursor-default opacity-70'}`}
+                    className={`liquid-glass rounded-xl p-6 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group`}
                   >
-                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-red-600 flex items-center justify-center mb-4 mx-auto ${tool.path ? 'group-hover:scale-110' : ''} transition-transform`}>
+                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-red-600 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform`}>
                       <span className="material-symbols-outlined text-2xl text-white">{tool.icon}</span>
                     </div>
                     <h3 className="text-base font-bold text-white text-center">{tool.name}</h3>

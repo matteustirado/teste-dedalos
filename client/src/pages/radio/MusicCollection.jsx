@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify';
+import Sidebar from '../../components/Sidebar';
 
 const API_URL = 'http://localhost:4000'
 const WEEK_DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
@@ -346,60 +347,41 @@ export default function MusicCollection() {
 
   return (
     <div className="min-h-screen bg-gradient-warm flex">
-      <aside className="fixed left-0 top-0 h-screen w-64 bg-bg-dark-primary/50 backdrop-blur-sm border-r border-white/10 p-4 flex flex-col justify-between z-10">
-        <div className="flex flex-col gap-8">
-           <div className="flex items-center gap-3">
-               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-red-600 flex items-center justify-center">
-               <span className="material-symbols-outlined text-white text-2xl">music_video</span>
-               </div>
-               <div className="flex flex-col">
-               <h1 className="text-white text-lg font-bold leading-tight">Acervo</h1>
-               <p className="text-text-muted text-sm">Rádio Dedalos</p>
-               </div>
-           </div>
-           <nav className="flex flex-col gap-2">
-               <button onClick={() => navigate('/')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-               <span className="material-symbols-outlined">home</span>
-               <p className="text-base font-medium">Home</p>
-               </button>
-               <button onClick={() => navigate('/radio/dj')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-               <span className="material-symbols-outlined">radio</span>
-               <p className="text-base font-medium">Painel do DJ</p>
-               </button>
-               <button onClick={() => navigate('/radio/collection')} className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/20 text-primary border border-primary/50">
-               <span className="material-symbols-outlined">music_video</span>
-               <p className="text-base font-semibold">Acervo de Músicas</p>
-               </button>
-               <button onClick={() => navigate('/radio/playlist-creator')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-               <span className="material-symbols-outlined">playlist_add</span>
-               <p className="text-base font-medium">Criar Playlist</p>
-               </button>
-               <button onClick={() => navigate('/radio/library')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-               <span className="material-symbols-outlined">library_music</span>
-               <p className="text-base font-medium">Biblioteca</p>
-               </button>
-               <button onClick={() => navigate('/radio/schedule')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-                 <span className="material-symbols-outlined">calendar_month</span>
-                 <p className="text-base font-medium">Agendamento</p>
-               </button>
-           </nav>
-          </div>
-          <div className="flex flex-col gap-3">
-           <button disabled className="flex w-full items-center justify-center rounded-lg h-12 px-4 text-white text-base font-bold bg-gray-600 cursor-not-allowed opacity-50">
-               <span className="truncate">Ao Vivo</span>
-           </button>
-           <div className="text-center text-xs text-text-muted pb-2">
-               <p>© Developed by: <span className="text-primary font-semibold">Matteus Tirado</span></p>
-           </div>
-          </div>
-      </aside>
+      {/* Sidebar Componentizada */}
+      <Sidebar 
+        activePage="collection" 
+        headerTitle="Acervo" 
+        headerIcon="music_video" 
+      />
 
       <main className="ml-64 flex-1 p-8">
         <div className="max-w-7xl mx-auto w-full">
-          <div className="flex justify-between items-center mb-6">
+          
+          {/* HEADER COM BOTÕES (ALTERAÇÃO AQUI) */}
+          <div className="flex justify-between items-end mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-1">Acervo de Músicas</h1>
+              <h1 className="text-3xl font-bold text-white mb-1">Acervo Musical</h1>
               <p className="text-text-muted text-sm">Gerencie todas as músicas e comerciais da rádio</p>
+            </div>
+            
+            <div className="flex gap-3">
+                {/* BOTÃO HISTÓRICO DE PEDIDOS */}
+                <button 
+                    onClick={() => navigate('/radio/requests-history')}
+                    className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-lg border border-white/10 transition-colors font-semibold text-sm"
+                >
+                    <span className="material-symbols-outlined text-lg">history</span>
+                    Histórico de Pedidos
+                </button>
+
+                {/* BOTÃO NOVA PLAYLIST */}
+                <button 
+                    onClick={() => navigate('/radio/playlist-creator')}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/80 text-white px-4 py-2.5 rounded-lg shadow-lg shadow-primary/20 transition-all font-semibold text-sm"
+                >
+                    <span className="material-symbols-outlined text-lg">playlist_add</span>
+                    Nova Playlist
+                </button>
             </div>
           </div>
 
@@ -563,25 +545,25 @@ export default function MusicCollection() {
                        </select>
                        <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-base">expand_more</span>
                    </div>
-                 <button
-                       onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                       className="p-1.5 bg-white/10 border border-white/20 rounded-lg text-white hover:bg-white/20 transition-colors h-[31px] w-[31px] flex items-center justify-center"
-                       title={sortOrder === 'asc' ? "Ordem Crescente" : "Ordem Decrescente"}
-                 >
-                       <span className="material-symbols-outlined text-sm leading-none"> 
-                           {sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'}
-                       </span>
-                 </button>
-                  {selectedTrackIds.size > 0 && (
-                       <button
-                           onClick={handleDeleteSelected}
-                           disabled={loading}
-                           className="flex items-center gap-1.5 bg-red-600/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                       >
-                           <span className="material-symbols-outlined text-base leading-none">delete</span>
-                           Excluir ({selectedTrackIds.size})
-                       </button>
-                  )}
+                  <button
+                        onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        className="p-1.5 bg-white/10 border border-white/20 rounded-lg text-white hover:bg-white/20 transition-colors h-[31px] w-[31px] flex items-center justify-center"
+                        title={sortOrder === 'asc' ? "Ordem Crescente" : "Ordem Decrescente"}
+                  >
+                        <span className="material-symbols-outlined text-sm leading-none"> 
+                            {sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+                        </span>
+                  </button>
+                   {selectedTrackIds.size > 0 && (
+                        <button
+                            onClick={handleDeleteSelected}
+                            disabled={loading}
+                            className="flex items-center gap-1.5 bg-red-600/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span className="material-symbols-outlined text-base leading-none">delete</span>
+                            Excluir ({selectedTrackIds.size})
+                        </button>
+                   )}
                 <input
                   type="text"
                   placeholder="Buscar..."

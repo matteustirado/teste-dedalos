@@ -3,39 +3,51 @@ import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import axios from 'axios';
+import Sidebar from '../../components/Sidebar';
 
 const API_URL = 'http://localhost:4000';
 
+const formatDuration = (totalSeconds) => {
+    if (typeof totalSeconds !== 'number' || totalSeconds < 0) return '0:00';
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
 
 const AlbumArtVinyl = ({ musicaAtual }) => {
   const thumbnailUrl = musicaAtual?.thumbnail_url || 'https://placehold.co/300x300/1e1e1e/333333?text=Rádio+Dedalos';
   return (
-    <div className="relative w-40 h-40 flex-shrink-0">
+    <div className="relative w-72 h-40 flex-shrink-0">
+      <div 
+        className="absolute top-1/2 left-1/2 h-[90%] aspect-square rounded-full flex items-center justify-center border-4 border-gray-800 shadow-xl transition-transform duration-500 ease-out"
+        style={{
+          background: 'conic-gradient(from 0deg, #111 0deg, #333 45deg, #111 90deg, #333 135deg, #111 180deg, #333 225deg, #111 270deg, #333 315deg, #111 360deg)',
+          animation: musicaAtual ? 'spin 3s linear infinite' : 'none',
+          transform: musicaAtual ? 'translate(50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.8)',
+          opacity: musicaAtual ? 1 : 0,
+          zIndex: 0 
+        }}
+      >
+        <div className="absolute w-[95%] h-[95%] rounded-full border border-white/5"></div>
+        <div className="absolute w-[60%] h-[60%] rounded-full border border-white/5"></div>
+        <div className="w-1/3 h-1/3 bg-primary rounded-full border-4 border-gray-900 shadow-inner flex items-center justify-center">
+            <div className="w-1.5 h-1.5 bg-black rounded-full"></div>
+        </div>
+      </div>
       <img
         key={thumbnailUrl}
         src={thumbnailUrl}
         alt="Capa do Álbum"
-        className="w-full h-full object-cover rounded-lg shadow-lg animate-fade-in"
+        className="relative z-10 w-full h-full object-cover rounded-lg shadow-lg animate-fade-in"
       />
-      <div 
-        className="absolute top-1/2 left-1/2 -translate-x-[20%] -translate-y-1/2 w-[90%] h-[90%] bg-black rounded-full flex items-center justify-center border-4 border-gray-800 shadow-xl transition-transform duration-500 ease-out"
-        style={{
-          animation: musicaAtual ? 'spin 3s linear infinite' : 'none',
-          transform: musicaAtual ? 'translate(-20%, -50%) scale(1)' : 'translate(-60%, -50%) scale(0.8)',
-          opacity: musicaAtual ? 1 : 0
-        }}
-      >
-        <div className="w-1/4 h-1/4 bg-primary rounded-full border-2 border-gray-300"></div>
-      </div>
       <style>{`
-        @keyframes spin { from { transform: translate(-20%, -50%) rotate(0deg); } to { transform: translate(-20%, -50%) rotate(360deg); } }
+        @keyframes spin { from { transform: translate(50%, -50%) rotate(0deg); } to { transform: translate(50%, -50%) rotate(360deg); } }
         @keyframes fade-in { from { opacity: 0.5; } to { opacity: 1; } }
         .animate-fade-in { animation: fade-in 0.5s ease-out; }
       `}</style>
     </div>
   );
 };
-
 
 const ProgressBar = ({ progresso, crossfadeInfo }) => {
     const { tempoAtual, tempoTotal } = progresso;
@@ -89,24 +101,28 @@ const ProgressBar = ({ progresso, crossfadeInfo }) => {
     );
 };
 
-
 export default function DJController() {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null); // Ref para o input de arquivo
   
   const [socket, setSocket] = useState(null);
   const [musicaAtual, setMusicaAtual] = useState(null);
   const [fila, setFila] = useState([]);
   const [progresso, setProgresso] = useState({ tempoAtual: 0, tempoTotal: 0 });
   const [isConnected, setIsConnected] = useState(false);
-  const [isPausedLocally, setIsPausedLocally] = useState(false);
+  const [activeOverlay, setActiveOverlay] = useState(null); // Estado para saber se tem overlay
+  
+  const [isMuted, setIsMuted] = useState(() => {
+      return localStorage.getItem('dedalos_local_mute') === 'true';
+  });
+  
   const [crossfadeInfo, setCrossfadeInfo] = useState(null);
   
   const [playlists, setPlaylists] = useState([]);
   const [acervo, setAcervo] = useState([]);
   const [comerciais, setComerciais] = useState([]);
   const [buscaAcervo, setBuscaAcervo] = useState("");
-  const [isLive, setIsLive] = useState(false);
-
+  
   useEffect(() => {
     const newSocket = io(API_URL);
     setSocket(newSocket);
@@ -114,6 +130,7 @@ export default function DJController() {
 
     newSocket.on('connect', () => { setIsConnected(true); });
     newSocket.on('disconnect', () => { setIsConnected(false); });
+    
     newSocket.on('maestro:estadoCompleto', (estado) => {
         setMusicaAtual(estado.musicaAtual || null);
         setProgresso({
@@ -121,19 +138,34 @@ export default function DJController() {
             tempoTotal: estado.musicaAtual ? (estado.musicaAtual.end_segundos ?? estado.musicaAtual.duracao_segundos) : 0
         });
         setCrossfadeInfo(null);
+        setActiveOverlay(estado.overlayUrl); // Recebe overlay atual
     });
+    
     newSocket.on('maestro:filaAtualizada', (novaFila) => { setFila(novaFila || []); });
-    newSocket.on('maestro:progresso', (info) => { if (!isPausedLocally) { setProgresso(info); } });
-    newSocket.on('maestro:iniciarCrossfade', (info) => { setCrossfadeInfo(info); });
-    newSocket.on('maestro:tocarAgora', (info) => {
-         setMusicaAtual(info.musicaInfo);
-         setCrossfadeInfo(null);
-         setProgresso({ tempoAtual: 0, tempoTotal: info.musicaInfo.end_segundos ?? info.musicaInfo.duracao_segundos });
+    
+    newSocket.on('maestro:progresso', (info) => { 
+        setProgresso(info); 
     });
+    
+    newSocket.on('maestro:iniciarCrossfade', ({ playerAtivo, proximoPlayer, proximaMusica }) => {
+        setCrossfadeInfo({ playerAtivo, proximoPlayer, proximaMusica });
+    });
+    
+    newSocket.on('maestro:tocarAgora', ({ player, musicaInfo }) => {
+         setMusicaAtual(musicaInfo);
+         setCrossfadeInfo(null);
+         setProgresso({ tempoAtual: 0, tempoTotal: musicaInfo.end_segundos ?? musicaInfo.duracao_segundos });
+    });
+    
     newSocket.on('maestro:pararTudo', () => {
         setMusicaAtual(null);
         setProgresso({ tempoAtual: 0, tempoTotal: 0 });
         setCrossfadeInfo(null);
+    });
+
+    // Escuta atualização de overlay em tempo real
+    newSocket.on('maestro:overlayAtualizado', (url) => {
+        setActiveOverlay(url);
     });
 
     axios.get(`${API_URL}/api/playlists`)
@@ -148,13 +180,59 @@ export default function DJController() {
         .catch(err => toast.error("Falha ao carregar acervo/comerciais."));
 
     return () => { newSocket.disconnect(); };
-  }, [isPausedLocally]); 
-  
+  }, []); 
+
   const handlePularMusica = () => { if (socket) socket.emit('dj:pularMusica'); }
   const handleTocarComercialAgora = (trackId = null) => {
       if (socket) socket.emit('dj:tocarComercialAgora', trackId); 
   }
-  const handlePauseLocalToggle = () => { setIsPausedLocally(!isPausedLocally); }
+  
+  const handleMuteToggle = () => { 
+      const newState = !isMuted;
+      setIsMuted(newState);
+      localStorage.setItem('dedalos_local_mute', newState);
+      window.dispatchEvent(new Event('storage'));
+  }
+
+  // --- LÓGICA DE UPLOAD DE OVERLAY ---
+  const handleOverlayClick = () => {
+      fileInputRef.current.click();
+  }
+
+  const handleOverlayUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('overlay', file);
+
+      try {
+          await axios.post(`${API_URL}/api/overlay`, formData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          toast.success("Marca d'água atualizada!");
+      } catch (err) {
+          console.error(err);
+          toast.error("Erro ao enviar marca d'água.");
+      }
+      // Limpa o input
+      e.target.value = null;
+  }
+
+  const handleRemoveOverlay = async (e) => {
+      e.preventDefault(); // Previne abrir o seletor de arquivos se clicar com botão direito
+      e.stopPropagation();
+      if(window.confirm("Remover marca d'água da tela?")) {
+        try {
+            await axios.delete(`${API_URL}/api/overlay`);
+            toast.info("Marca d'água removida.");
+        } catch (err) {
+            toast.error("Erro ao remover.");
+        }
+      }
+  }
+  // ------------------------------------
+  
   const handleCarregarPlaylist = (playlistId) => {
       if (socket) socket.emit('dj:carregarPlaylistManual', playlistId);
   }
@@ -164,6 +242,7 @@ export default function DJController() {
   }
   
   const handleVeto = (itemId) => { if (socket && itemId) { socket.emit('dj:vetarPedido', itemId); } }
+  
   const getTagInfo = (item) => {
        switch (item.tipo) {
            case 'COMERCIAL_MANUAL': return { text: 'COMERCIAL', color: 'bg-yellow-500/20 text-yellow-400' };
@@ -184,56 +263,23 @@ export default function DJController() {
 
   return (
     <div className="min-h-screen bg-gradient-warm flex">
-      <aside className="fixed left-0 top-0 h-screen w-64 bg-bg-dark-primary/50 backdrop-blur-sm border-r border-white/10 p-4 flex flex-col justify-between z-10">
-        <div className="flex flex-col gap-8">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-red-600 flex items-center justify-center">
-                <span className="material-symbols-outlined text-white text-2xl">radio</span>
-              </div>
-              <span className={`absolute bottom-0 right-0 block h-3.5 w-3.5 rounded-full border-2 border-bg-dark-primary ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></span>
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-white text-lg font-bold leading-tight">Painel do DJ</h1>
-              <p className="text-text-muted text-sm">Rádio Dedalos</p>
-            </div>
-          </div>
-          <nav className="flex flex-col gap-2">
-            <button onClick={() => navigate('/')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">home</span>
-              <p className="text-base font-medium">Home</p>
-            </button>
-            <button className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/20 text-primary border border-primary/50">
-              <span className="material-symbols-outlined">radio</span>
-              <p className="text-base font-semibold">Painel do DJ</p>
-            </button>
-            <button onClick={() => navigate('/radio/collection')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">music_video</span>
-              <p className="text-base font-medium">Acervo de Músicas</p>
-            </button>
-            <button onClick={() => navigate('/radio/playlist-creator')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">playlist_add</span>
-              <p className="text-base font-medium">Criar Playlist</p>
-            </button>
-            <button onClick={() => navigate('/radio/library')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">library_music</span>
-              <p className="text-base font-medium">Biblioteca</p>
-            </button>
-            <button onClick={() => navigate('/radio/schedule')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">calendar_month</span>
-              <p className="text-base font-medium">Agendamento</p>
-            </button>
-          </nav>
-        </div>
-        <div className="flex flex-col gap-3">
-          <button disabled className="flex w-full items-center justify-center rounded-lg h-12 px-4 text-white text-base font-bold bg-gray-600 cursor-not-allowed opacity-50">
-            <span className="truncate">Ao Vivo</span>
-          </button>
-          <div className="text-center text-xs text-text-muted pb-2">
-            <p>© Developed by: <span className="text-primary font-semibold">Matteus Tirado</span></p>
-          </div>
-        </div>
-      </aside>
+      <Sidebar 
+        activePage="dj" 
+        headerTitle="Painel do DJ" 
+        headerIcon="radio"
+        headerExtra={
+            <span className={`absolute bottom-0 right-0 block h-3.5 w-3.5 rounded-full border-2 border-bg-dark-primary ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></span>
+        }
+      />
+      
+      {/* Input Oculto para Upload */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleOverlayUpload} 
+        accept="image/png" 
+        className="hidden" 
+      />
 
       <main className="ml-64 flex-1 p-8 overflow-y-auto">
         <div className="grid grid-cols-3 gap-6">
@@ -245,7 +291,7 @@ export default function DJController() {
               <div className="flex gap-6 items-start">
                   <AlbumArtVinyl musicaAtual={musicaAtual} />
                   
-                  <div className="flex flex-col gap-3 w-full flex-1 min-w-0">
+                  <div className="flex flex-col gap-3 w-full flex-1 min-w-0 pl-14">
                       {musicaAtual ? (
                           <div className="animate-fade-in text-left">
                                <p className="text-white text-xl font-bold leading-tight truncate" title={musicaAtual.titulo}>{musicaAtual.titulo}</p>
@@ -260,12 +306,15 @@ export default function DJController() {
                       
                       <div className="flex items-center justify-start gap-3">
                           <button 
-                            onClick={handlePauseLocalToggle} 
-                            className={`flex shrink-0 items-center justify-center rounded-full w-14 h-14 transition-all duration-300 ${isPausedLocally ? 'bg-primary text-white hover:bg-primary/80' : 'bg-white/20 text-white hover:bg-white/30'}`}
-                            title={isPausedLocally ? "Retomar (Local)" : "Pausar (Local)"}
+                            onClick={handleMuteToggle} 
+                            className={`flex shrink-0 items-center justify-center rounded-full w-14 h-14 transition-all duration-300 ${isMuted ? 'bg-white/20 text-red-400 hover:bg-white/30' : 'bg-primary text-white hover:bg-primary/80'}`}
+                            title={isMuted ? "Ativar Som (Monitor)" : "Mutar Som (Monitor)"}
                           >
-                            <span className="material-symbols-outlined text-3xl">{isPausedLocally ? 'play_arrow' : 'pause'}</span>
+                            <span className="material-symbols-outlined text-3xl">
+                                {isMuted ? 'volume_off' : 'volume_up'}
+                            </span>
                           </button>
+                          
                           <button 
                             onClick={handlePularMusica}
                             className="flex shrink-0 items-center justify-center rounded-full w-10 h-10 text-white hover:text-primary transition-colors"
@@ -273,6 +322,19 @@ export default function DJController() {
                           >
                             <span className="material-symbols-outlined text-2xl">skip_next</span>
                           </button>
+
+                          {/* BOTÃO DE OVERLAY (MARCA D'ÁGUA) */}
+                          <div className="h-8 w-px bg-white/10 mx-1"></div>
+                          
+                          <button 
+                            onClick={handleOverlayClick}
+                            onContextMenu={handleRemoveOverlay} // Clique direito para remover
+                            className={`flex shrink-0 items-center justify-center rounded-full w-10 h-10 transition-colors ${activeOverlay ? 'bg-blue-500 text-white hover:bg-blue-600' : 'text-white hover:text-blue-400'}`}
+                            title="Adicionar Marca D'água (Overlay) - Clique Direito para remover"
+                          >
+                            <span className="material-symbols-outlined text-2xl">branding_watermark</span>
+                          </button>
+
                       </div>
 
                       <ProgressBar progresso={progresso} crossfadeInfo={crossfadeInfo} />
@@ -314,7 +376,7 @@ export default function DJController() {
                 {fila.map((item, index) => {
                     const tag = getTagInfo(item);
                     return (
-                        <div key={item.id} className="flex items-center p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                        <div key={`${item.id}-${index}`} className="flex items-center p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
                             <span className="text-lg text-text-muted font-mono w-6 text-left">{index + 1}.</span>
                             <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-white text-sm truncate" title={item.titulo}>{item.titulo || "Carregando..."}</p>
@@ -340,7 +402,7 @@ export default function DJController() {
             
             <div className="liquid-glass rounded-xl p-6" style={{ height: '280px' }}>
               <h2 className="text-xl font-bold text-white mb-4">Playlists</h2>
-              <div className="space-y-3 mb-3 overflow-y-auto h-40 pr-2">
+              <div className="space-y-3 mb-3 overflow-y-auto h-36 pr-2">
                 {playlists.length === 0 && <p className="text-text-muted text-sm">Carregando playlists...</p>}
                 {playlists.map((playlist) => (
                   <div key={playlist.id} className="bg-white/5 p-4 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors">
@@ -358,7 +420,7 @@ export default function DJController() {
                   </div>
                 ))}
               </div>
-              <button onClick={() => navigate('/radio/library')} className="w-full bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/20 transition-colors">Ver Mais</button>
+              <button onClick={() => navigate('/radio/library')} className="w-full bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/20 transition-colors mb-2">Ver Mais</button>
             </div>
             
             <div className="liquid-glass rounded-xl p-6">

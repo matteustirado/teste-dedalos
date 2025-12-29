@@ -15,6 +15,15 @@ services:
     volumes:
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
       - db_data:/var/lib/mysql
+    # --- NOVO: Verificação de Saúde do Banco ---
+    healthcheck:
+      # Tenta pingar o banco usando a senha de root definida nas variáveis
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # -------------------------------------------
 
   backend:
     build:
@@ -23,16 +32,21 @@ services:
     container_name: radio_dedalos_backend
     restart: always
     environment:
-      DB_HOST: ${DB_HOST}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: db # Garanta que no seu .env ou hardcoded no server, o host seja 'db'
+      DB_USER: ${DB_USER} 
+      # Se o seu backend usa o user root, mude aqui para DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD} 
+      # Se o seu backend usa o user root, mude aqui para DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       DB_DATABASE: ${DB_DATABASE}
       PORT: ${PORT}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
     ports:
       - "${BACKEND_PORT}:${PORT}"
+    # --- ALTERADO: Espera o Healthcheck ---
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    # --------------------------------------
     volumes:
       - ./server:/app
       - /app/node_modules

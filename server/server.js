@@ -6,10 +6,14 @@ import pool from './src/config/db.js'
 import trackRoutes from './src/routes/trackRoutes.js'
 import playlistRoutes from './src/routes/playlistRoutes.js'
 import scheduleRoutes from './src/routes/scheduleRoutes.js'
+import jukeboxRoutes from './src/routes/jukeboxRoutes.js' 
 import path from 'path' 
 import { fileURLToPath } from 'url'; 
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import { iniciarMaestro, setOverlayRadio } from './src/controllers/conductorController.js'; 
+import multer from 'multer'; 
+import fs from 'fs'; 
 
 dotenv.config()
 
@@ -28,17 +32,53 @@ const io = new Server(httpServer, {
 
 const port = process.env.PORT || 4000
 
+// --- CONFIGURAÇÃO DE UPLOAD ---
+const overlayDir = path.join(__dirname, 'src/assets/upload/overlays');
+if (!fs.existsSync(overlayDir)) {
+    fs.mkdirSync(overlayDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, overlayDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'overlay-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage: storage });
+// -------------------------------------
+
 app.use(cors())
 app.use(morgan('dev'))
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use('/assets/upload/covers', express.static(path.join(__dirname, 'src/assets/upload/covers')));
+app.use('/assets/upload/overlays', express.static(path.join(__dirname, 'src/assets/upload/overlays'))); 
 
-
+// Rotas da API
 app.use('/api/tracks', trackRoutes)
 app.use('/api/playlists', playlistRoutes)
 app.use('/api/agendamentos', scheduleRoutes)
+app.use('/api/jukebox', jukeboxRoutes) 
+
+// --- ROTA DE UPLOAD DE OVERLAY ---
+app.post('/api/overlay', upload.single('overlay'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    }
+    const fileUrl = `/assets/upload/overlays/${req.file.filename}`;
+    setOverlayRadio(fileUrl);
+    res.json({ message: 'Overlay atualizado!', url: fileUrl });
+});
+
+app.delete('/api/overlay', (req, res) => {
+    setOverlayRadio(null);
+    res.json({ message: 'Overlay removido!' });
+});
+// ----------------------------------------
 
 app.get('/', async (req, res) => {
   try {
@@ -49,16 +89,29 @@ app.get('/', async (req, res) => {
   }
 })
 
+// === CORREÇÃO IMPORTANTE AQUI ===
 io.on('connection', (socket) => {
-  console.log(`[Socket.io] Novo cliente conectado: ${socket.id}`);
-
-  socket.on('disconnect', () => {
-    console.log(`[Socket.io] Cliente desconectado: ${socket.id}`);
+  
+  // 1. Listener para SUGESTÕES manuais
+  socket.on('jukebox:enviarSugestao', (data) => {
+      import('./src/controllers/jukeboxController.js').then(ctrl => {
+          ctrl.handleReceberSugestao(socket, data);
+      }).catch(err => console.error("Erro ao carregar controller de sugestão:", err));
   });
+
+  // 2. Listener para PEDIDOS NORMAIS (Faltava isso!)
+  socket.on('jukebox:adicionarPedido', (data) => {
+      import('./src/controllers/jukeboxController.js').then(ctrl => {
+          ctrl.handleAdicionarPedido(socket, data);
+      }).catch(err => console.error("Erro ao carregar controller de pedido:", err));
+  });
+
 });
+
+iniciarMaestro();
 
 httpServer.listen(port, () => {
   console.log(`Backend rodando (com Socket.io) na porta ${port}`)
 })
 
-export { io };
+export { io }

@@ -1,31 +1,26 @@
 import { io } from '../../server.js';
 import pool from '../config/db.js';
-import { handleAdicionarPedido } from './jukeboxController.js';
 
-
+// --- ESTADO DO MAESTRO ---
 let estadoRadio = {
     musicaAtual: null,
     tempoAtualSegundos: 0,
     playlistAtiva: [],
     playlistAgendadaAtual: null,
     filaComercialManual: [],
-    filaDePedidos: [],
+    filaDePedidos: [], // Fila principal
     contadorComercial: 0,
     isCrossfading: false,
-    playerAtivo: 'A'
+    playerAtivo: 'A',
+    overlayUrl: null
 };
-
-
 
 let cacheComerciais = [];
 let cacheFallbacks = {};
 
-
-
-
 const TICK_INTERVAL_MS = 250;
 let ticker = null;
-let ultimaHoraVerificada = -1;
+let ultimoSlotVerificado = -1;
 
 const formatDateToYYYYMMDD = (date) => {
     if (!date) return null;
@@ -42,12 +37,14 @@ const iniciarTicker = () => {
     ticker = setInterval(async () => {
         
         const agora = new Date();
-        const horaAtual = agora.getUTCHours();
+        const hora = agora.getUTCHours();
+        const minutos = agora.getUTCMinutes();
+        const slotAtual = (hora * 6) + Math.floor(minutos / 10);
         
-        if (horaAtual !== ultimaHoraVerificada) {
-            console.log(`[Maestro Ticker] Nova hora detectada: ${horaAtual}:00 UTC`);
-            ultimaHoraVerificada = horaAtual;
-            await verificarAgendamento(agora);
+        if (slotAtual !== ultimoSlotVerificado) {
+            console.log(`[Maestro Ticker] Novo slot detectado: ${slotAtual} (${hora}:${minutos} UTC)`);
+            ultimoSlotVerificado = slotAtual;
+            await verificarAgendamento(agora, slotAtual);
         }
         
         if (!estadoRadio.musicaAtual) {
@@ -93,12 +90,7 @@ const iniciarTicker = () => {
     }, TICK_INTERVAL_MS);
 };
 
-
-
 const tocarProximaMusica = async () => {
-    if (estadoRadio.musicaAtual !== null && !estadoRadio.isCrossfading) {
-    }
-
     estadoRadio.isCrossfading = false;
     estadoRadio.tempoAtualSegundos = 0;
     estadoRadio.musicaAtual = null;
@@ -111,16 +103,14 @@ const tocarProximaMusica = async () => {
         proximaMusicaId = estadoRadio.filaComercialManual.shift();
         origem = 'COMERCIAL_MANUAL';
         estadoRadio.contadorComercial = 0;
-        console.log(`[Maestro] Prioridade 2: Comercial Manual (ID: ${proximaMusicaId})`);
+        console.log(`[Maestro] Prioridade 1: Comercial Manual (ID: ${proximaMusicaId})`);
     }
-    
     else if (estadoRadio.contadorComercial >= 10 && cacheComerciais.length > 0) {
         proximaMusicaId = cacheComerciais[Math.floor(Math.random() * cacheComerciais.length)];
         origem = 'COMERCIAL_AUTO';
         estadoRadio.contadorComercial = 0;
         console.log(`[Maestro] Prioridade 2: Comercial Automático (ID: ${proximaMusicaId})`);
     }
-    
     else if (estadoRadio.filaDePedidos.length > 0) {
         const proximoPedido = estadoRadio.filaDePedidos.shift();
         proximaMusicaId = proximoPedido.trackId;
@@ -129,14 +119,12 @@ const tocarProximaMusica = async () => {
         estadoRadio.contadorComercial++;
         console.log(`[Maestro] Prioridade 3: Fila de Pedidos (${origem}, ID: ${proximaMusicaId})`);
     }
-    
     else if (estadoRadio.playlistAtiva.length > 0) {
         proximaMusicaId = estadoRadio.playlistAtiva.shift();
         origem = 'PLAYLIST';
         estadoRadio.contadorComercial++;
         console.log(`[Maestro] Prioridade 4: Playlist Ativa (ID: ${proximaMusicaId})`);
     }
-    
     else {
         console.log("[Maestro] Fila e Playlist vazias. Verificando Fallback...");
         const diaSemana = ["DOMINGO", "SEGUNDA", "TERCA", "QUARTA", "QUINTA", "SEXTA", "SABADO"][new Date().getUTCDay()];
@@ -168,7 +156,10 @@ const tocarProximaMusica = async () => {
             console.log(`[Maestro] Tocando agora (${origem}): "${trackInfo.titulo}" (Player ${estadoRadio.playerAtivo})`);
             
             if (pedidoInfo && pedidoInfo.id) {
-                atualizarStatusPedido(pedidoInfo.id, 'TOCADO');
+                // Se o ID for numérico (do banco), atualiza o status
+                if (!String(pedidoInfo.id).startsWith('jb_') && !String(pedidoInfo.id).startsWith('dj_')) {
+                    atualizarStatusPedido(pedidoInfo.id, 'TOCADO');
+                }
             }
         } else {
             console.error(`[Maestro] ERRO: Track ID ${proximaMusicaId} (Origem: ${origem}) não encontrada no DB. Pulando.`);
@@ -184,9 +175,9 @@ const tocarProximaMusica = async () => {
     io.emit('maestro:filaAtualizada', await comporFilaVisual());
 };
 
-
-
+// Esta função agora é chamada pelo JukeboxController (do server.js)
 export const adicionarPedidoNaFila = (pedidoObjeto) => {
+    // Se o pedido veio do banco, ele já tem ID. Se veio do DJ (memória), geramos um ID temporário.
     if (!pedidoObjeto.id) {
         pedidoObjeto.id = `dj_${Math.random().toString(36).substring(2, 9)}`;
     }
@@ -194,11 +185,17 @@ export const adicionarPedidoNaFila = (pedidoObjeto) => {
     estadoRadio.filaDePedidos.push(pedidoObjeto);
     const posicao = estadoRadio.filaComercialManual.length + estadoRadio.filaDePedidos.length;
     console.log(`[Maestro] Pedido (ID: ${pedidoObjeto.id}) adicionado à filaDePedidos. Posição: ${posicao}`);
+    
+    // Se não estiver tocando nada, inicia o processo
+    if (!estadoRadio.musicaAtual) {
+         tocarProximaMusica();
+    } else {
+         // Se já estiver tocando, apenas atualiza a visualização da fila
+         comporFilaVisual().then(fila => io.emit('maestro:filaAtualizada', fila));
+    }
+
     return posicao;
 };
-
-
-
 
 const safeJsonParse = (input) => {
   if (Array.isArray(input)) { return input; }
@@ -244,7 +241,6 @@ const obterProximaMusicaInfo = async () => {
     return null;
 };
 
-
 export const comporFilaVisual = async () => {
     const proximas5 = [];
     
@@ -265,6 +261,7 @@ export const comporFilaVisual = async () => {
         proximas5.push({ 
             id: `pedido_${pedido.id}`,
             titulo: trackInfo ? trackInfo.titulo : "Música não encontrada",
+            artista: trackInfo ? trackInfo.artista : "", 
             tipo: pedido.tipo, 
             unidade: pedido.unidade 
         });
@@ -276,6 +273,7 @@ export const comporFilaVisual = async () => {
          proximas5.push({ 
              id: `pl_${trackId}`,
              titulo: trackInfo ? trackInfo.titulo : "Música não encontrada", 
+             artista: trackInfo ? trackInfo.artista : "", 
              tipo: 'PLAYLIST', 
              unidade: '' 
          });
@@ -325,27 +323,26 @@ const carregarPlaylist = async (playlistId, isAgendada = true) => {
     }
 }
 
-const verificarAgendamento = async (dataHoraAtual) => {
+const verificarAgendamento = async (dataHoraAtual, slotAtual) => {
     const dataString = formatDateToYYYYMMDD(dataHoraAtual);
-    const hora = dataHoraAtual.getUTCHours();
     
     try {
-        console.log(`[Maestro] Verificando agendamento para ${dataString} às ${hora}:00...`);
+        console.log(`[Maestro] Verificando agendamento para ${dataString} no Slot: ${slotAtual}...`);
         const [rows] = await pool.query(
-            "SELECT playlist_id FROM agendamentos WHERE data_agendamento = ? AND hora_inicio = ?",
-            [dataString, hora]
+            "SELECT playlist_id FROM agendamentos WHERE data_agendamento = ? AND slot_index = ?",
+            [dataString, slotAtual]
         );
         
         if (rows.length > 0) {
             const playlistIdAgendada = rows[0].playlist_id;
             
             if (playlistIdAgendada === null) {
-                 console.log(`[Maestro] Agendamento para ${hora}:00 é Tempo Vazio (NULL).`);
+                 console.log(`[Maestro] Agendamento para Slot ${slotAtual} é Tempo Vazio (NULL).`);
                  estadoRadio.playlistAtiva = [];
                  estadoRadio.playlistAgendadaAtual = null;
             }
             else if (playlistIdAgendada !== estadoRadio.playlistAgendadaAtual) {
-                console.log(`[Maestro] AGENDAMENTO ATIVADO: Carregando Playlist ID ${playlistIdAgendada} para às ${hora}:00.`);
+                console.log(`[Maestro] AGENDAMENTO ATIVADO: Carregando Playlist ID ${playlistIdAgendada}.`);
                 await carregarPlaylist(playlistIdAgendada, true);
                 
                 if (estadoRadio.filaDePedidos.length === 0) {
@@ -356,7 +353,7 @@ const verificarAgendamento = async (dataHoraAtual) => {
                 }
             }
         } else {
-            console.log(`[Maestro] Nenhum agendamento encontrado para ${hora}:00.`);
+            console.log(`[Maestro] Nenhum agendamento encontrado para Slot ${slotAtual}.`);
             estadoRadio.playlistAgendadaAtual = null; 
         }
         
@@ -372,7 +369,6 @@ const atualizarStatusPedido = async (pedidoDbId, status) => {
          console.error(`[Maestro] Erro ao atualizar status do pedido ${pedidoDbId}:`, err);
     }
 }
-
 
 const carregarCacheConfig = async () => {
     try {
@@ -402,20 +398,16 @@ const carregarCacheConfig = async () => {
     }
 };
 
-
-
-
 const djCarregarPlaylistManual = async (playlistId) => {
     console.log(`[Maestro] DJ solicitou carregar playlist manual ID: ${playlistId}`);
     await carregarPlaylist(playlistId, false);
     
-    if (estadoRadio.filaDePedidos.length === 0 && estadoRadio.filaComercialManual.length === 0) {
+    if (!estadoRadio.musicaAtual) {
         tocarProximaMusica(); 
     } else {
         io.emit('maestro:filaAtualizada', await comporFilaVisual());
     }
 };
-
 
 const djTocarComercialAgora = async () => {
     console.log(`[Maestro] DJ solicitou tocar comercial agora.`);
@@ -428,11 +420,10 @@ const djTocarComercialAgora = async () => {
     
     io.emit('maestro:filaAtualizada', await comporFilaVisual());
     
-    if (!estadoRadio.isCrossfading && estadoRadio.musicaAtual) {
+    if (!estadoRadio.musicaAtual) {
          tocarProximaMusica();
     }
 };
-
 
 const djVetarPedido = async (itemId) => {
     console.log(`[Maestro] DJ solicitou vetar item: ${itemId}`);
@@ -442,7 +433,11 @@ const djVetarPedido = async (itemId) => {
     if (pedidoIndex > -1) {
         const pedidoRemovido = estadoRadio.filaDePedidos.splice(pedidoIndex, 1)[0];
         console.log(`[Maestro] Pedido ${pedidoRemovido.id} (Track: ${pedidoRemovido.trackId}) vetado da filaDePedidos.`);
-        atualizarStatusPedido(pedidoRemovido.id, 'VETADO');
+        
+        // Verifica se é pedido de banco de dados (ID numérico) para atualizar status
+        if (!String(pedidoRemovido.id).startsWith('dj_')) {
+            atualizarStatusPedido(pedidoRemovido.id, 'VETADO');
+        }
         itemVetado = true;
     } else {
          let comercialId = itemId.split('_')[1];
@@ -459,7 +454,6 @@ const djVetarPedido = async (itemId) => {
     }
 };
 
-
 const djAdicionarPedido = async (trackId) => {
      console.log(`[Maestro] DJ solicitou adicionar track ID: ${trackId} à fila.`);
      const pedidoObjeto = {
@@ -470,24 +464,30 @@ const djAdicionarPedido = async (trackId) => {
          tipo: 'DJ'
      };
      
-     const posicao = adicionarPedidoNaFila(pedidoObjeto);
+     adicionarPedidoNaFila(pedidoObjeto);
      
      io.emit('maestro:filaAtualizada', await comporFilaVisual());
      
-     if (!estadoRadio.isCrossfading && estadoRadio.musicaAtual) {
+     if (!estadoRadio.musicaAtual) {
          tocarProximaMusica();
     }
 };
 
-
-
-
+export const setOverlayRadio = (url) => {
+    console.log(`[Maestro] Atualizando Overlay Global: ${url}`);
+    estadoRadio.overlayUrl = url;
+    io.emit('maestro:overlayAtualizado', url);
+    io.emit('maestro:estadoCompleto', estadoRadio);
+};
 
 export const iniciarMaestro = async () => {
     console.log("[Maestro] Iniciando o Maestro da Rádio...");
     
     await carregarCacheConfig();
-    ultimaHoraVerificada = new Date().getUTCHours() - 1; 
+    
+    const agora = new Date();
+    ultimoSlotVerificado = (agora.getUTCHours() * 6) + Math.floor(agora.getUTCMinutes() / 10) - 1;
+
     iniciarTicker(); 
     
     io.on('connection', (socket) => {
@@ -495,7 +495,6 @@ export const iniciarMaestro = async () => {
         socket.emit('maestro:estadoCompleto', estadoRadio);
         comporFilaVisual().then(fila => socket.emit('maestro:filaAtualizada', fila));
 
-        
         socket.on('dj:pularMusica', () => {
             console.log(`[Maestro] DJ ${socket.id} solicitou 'pularMusica'.`);
             tocarProximaMusica();
@@ -521,14 +520,11 @@ export const iniciarMaestro = async () => {
              djCarregarPlaylistManual(playlistId);
         });
         
-        
-         socket.on('jukebox:adicionarPedido', (data) => {
-             console.log(`[Maestro] Recebido 'jukebox:adicionarPedido' de ${socket.id}`);
-             handleAdicionarPedido(socket, data); 
-         });
+        // REMOVIDO: O ouvinte 'jukebox:adicionarPedido' foi retirado daqui 
+        // porque agora o server.js -> jukeboxController.js lida com isso 
+        // para salvar no banco de dados primeiro.
     });
 };
-
 
 export const getEstadoRadio = () => {
     return estadoRadio;

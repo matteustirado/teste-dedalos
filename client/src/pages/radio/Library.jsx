@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify';
+import Sidebar from '../../components/Sidebar';
 
 const API_URL = 'http://localhost:4000'
-
 
 const formatTotalDuration = (totalSeconds) => {
   if (typeof totalSeconds !== 'number' || totalSeconds <= 0) return '0s';
@@ -28,12 +28,10 @@ export default function Library() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [playlistToDelete, setPlaylistToDelete] = useState(null);
 
-
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        
         const [playlistsRes, tracksRes] = await Promise.all([
           axios.get(`${API_URL}/api/playlists`),
           axios.get(`${API_URL}/api/tracks`)
@@ -49,7 +47,6 @@ export default function Library() {
     };
     fetchData();
   }, []);
-
 
   const getPlaylistDetails = (playlist) => {
      if (!allTracks || allTracks.length === 0) {
@@ -73,30 +70,25 @@ export default function Library() {
     };
    };
 
-
   const filteredPlaylists = useMemo(() => {
     if (!searchTerm) return playlists;
     const lowerQuery = searchTerm.toLowerCase();
     return playlists.filter(p => p.nome.toLowerCase().includes(lowerQuery));
   }, [playlists, searchTerm]);
 
-
   const handleEditPlaylist = (playlistId) => {
     navigate(`/radio/playlist-creator/${playlistId}`);
   };
-
 
   const openDeletePlaylistModal = (playlist) => {
     setPlaylistToDelete(playlist);
     setShowDeleteModal(true);
   };
 
-
   const closeDeletePlaylistModal = () => {
     setPlaylistToDelete(null);
     setShowDeleteModal(false);
   };
-
 
   const confirmDeletePlaylist = async () => {
     if (!playlistToDelete) return;
@@ -112,58 +104,14 @@ export default function Library() {
     }
   };
 
-
   return (
     <div className="min-h-screen bg-gradient-warm flex">
-      <aside className="fixed left-0 top-0 h-screen w-64 bg-bg-dark-primary/50 backdrop-blur-sm border-r border-white/10 p-4 flex flex-col justify-between z-10">
-        <div className="flex flex-col gap-8">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-red-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-white text-2xl">library_music</span>
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-white text-lg font-bold leading-tight">Biblioteca</h1>
-              <p className="text-text-muted text-sm">Rádio Dedalos</p>
-            </div>
-          </div>
-          <nav className="flex flex-col gap-2">
-            <button onClick={() => navigate('/')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">home</span>
-              <p className="text-base font-medium">Home</p>
-            </button>
-            <button onClick={() => navigate('/radio/dj')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">radio</span>
-              <p className="text-base font-medium">Painel do DJ</p>
-            </button>
-            <button onClick={() => navigate('/radio/collection')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">music_video</span>
-              <p className="text-base font-medium">Acervo de Músicas</p>
-            </button>
-            <button onClick={() => navigate('/radio/playlist-creator')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">playlist_add</span>
-              <p className="text-base font-medium">Criar Playlist</p>
-            </button>
-            
-            <button className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/20 text-primary border border-primary/50">
-              <span className="material-symbols-outlined">library_music</span>
-              <p className="text-base font-semibold">Biblioteca</p>
-            </button>
-            
-            <button onClick={() => navigate('/radio/schedule')} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-white/10 transition-colors">
-              <span className="material-symbols-outlined">calendar_month</span>
-              <p className="text-base font-medium">Agendamento</p>
-            </button>
-          </nav>
-        </div>
-        <div className="flex flex-col gap-3">
-          <button disabled className="flex w-full items-center justify-center rounded-lg h-12 px-4 text-white text-base font-bold bg-gray-600 cursor-not-allowed opacity-50">
-            <span className="truncate">Ao Vivo</span>
-          </button>
-          <div className="text-center text-xs text-text-muted pb-2">
-            <p>© Developed by: <span className="text-primary font-semibold">Matteus Tirado</span></p>
-          </div>
-        </div>
-      </aside>
+      {/* Sidebar Componentizada */}
+      <Sidebar 
+        activePage="library" 
+        headerTitle="Biblioteca" 
+        headerIcon="library_music" 
+      />
 
       <main className="ml-64 flex-1 p-8">
         <div className="max-w-7xl mx-auto w-full">
@@ -260,7 +208,6 @@ export default function Library() {
         </div>
       </main>
 
-      
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="liquid-glass rounded-xl p-8 max-w-md w-full mx-4">
