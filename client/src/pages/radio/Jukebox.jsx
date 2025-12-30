@@ -122,23 +122,20 @@ export default function Jukebox() {
         fetchTracks();
     });
 
-    // --- OUVINTES DE RESPOSTA (Corrige o giro infinito) ---
+    // --- OUVINTES DE RESPOSTA ---
     
-    // 1. Pedido Aceito (Música da Lista)
     newSocket.on('jukebox:pedidoAceito', () => {
-        setIsValidating(false); // Para o spinner
+        setIsValidating(false); 
         setRequestStatus('SUCCESS_REQUEST');
         setTimeout(() => resetForm(), 5000);
     });
 
-    // 2. Sugestão Aceita (Manual)
     newSocket.on('jukebox:sugestaoAceita', () => {
-        setIsValidating(false); // Para o spinner
+        setIsValidating(false); 
         setRequestStatus('SUCCESS_SUGGESTION');
         setTimeout(() => resetForm(), 5000);
     });
 
-    // 3. Pedido Recusado (Já tocando/fila cheia/vetado)
     newSocket.on('jukebox:pedidoRecusado', ({ motivo }) => {
         setIsValidating(false);
         setRefusalReason(motivo || 'Pedido não pôde ser processado.');
@@ -146,7 +143,6 @@ export default function Jukebox() {
         setTimeout(() => resetForm(), 6000);
     });
 
-    // 4. Erro Genérico (Limite spam, erros de banco)
     newSocket.on('jukebox:erroPedido', ({ message }) => {
         setIsValidating(false);
         setRefusalReason(message || 'Erro desconhecido.');
@@ -207,7 +203,7 @@ export default function Jukebox() {
 
   const handleSubmit = async () => {
     setIsCodeError(false);
-    setIsValidating(true); // Inicia spinner
+    setIsValidating(true);
 
     try {
         const isValid = await validateCustomerCode(customerCode, unitLabel);
@@ -233,7 +229,6 @@ export default function Jukebox() {
                     pulseiraId: customerCode,
                     unidade: unitLabel
                 });
-                // REMOVIDO: A atualização otimista aqui. Agora espera 'jukebox:sugestaoAceita'
             }
         }
     } catch (error) {
@@ -242,7 +237,6 @@ export default function Jukebox() {
     }
   };
 
-  // --- RENDERIZAÇÃO DE FEEDBACK ---
   if (requestStatus !== 'IDLE') {
       let icon = '';
       let colorClass = '';
@@ -437,12 +431,14 @@ export default function Jukebox() {
                 
                 <div className="flex gap-4">
                     <div className="w-40">
+                        {/* ALTERAÇÃO AQUI: Mudado para 'text' e adicionado replace(/\D/g, '') */}
                         <input 
-                            type="number" 
+                            type="text" 
+                            inputMode="numeric"
                             className={`w-full bg-black/30 border rounded-2xl py-4 px-2 text-xl text-white placeholder:text-white/20 focus:outline-none text-center font-mono tracking-widest ${isCodeError ? 'border-red-500 animate-shake' : 'border-white/10 focus:border-primary'}`}
                             placeholder="CÓDIGO"
                             value={customerCode}
-                            onChange={(e) => setCustomerCode(e.target.value)}
+                            onChange={(e) => setCustomerCode(e.target.value.replace(/\D/g, ''))}
                         />
                     </div>
                     <button 
