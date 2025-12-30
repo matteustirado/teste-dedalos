@@ -451,7 +451,19 @@ export default function MusicCollection() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-text-muted mb-1">Ano</label>
-                    <input type="number" name="ano" placeholder="(Opcional)" value={formData.ano || ''} onChange={handleFormChange} className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder:text-text-muted/50" />
+                    <input 
+                      type="text" 
+                      name="ano" 
+                      inputMode="numeric" 
+                      maxLength={4} 
+                      placeholder="(Opcional)" 
+                      value={formData.ano || ''} 
+                      onChange={(e) => {
+                        const onlyNums = e.target.value.replace(/\D/g, '');
+                        setFormData(prev => ({ ...prev, ano: onlyNums }));
+                      }} 
+                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder:text-text-muted/50" 
+                    />
                   </div>
                 </div>
                 <div className="col-span-1">
@@ -463,13 +475,34 @@ export default function MusicCollection() {
                   <input type="text" name="diretor" placeholder="(Opcional)" value={formData.diretor || ''} onChange={handleFormChange} className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder:text-text-muted/50" />
                 </div>
                 <div className="col-span-1 grid grid-cols-2 gap-4">
+                  {/* AJUSTE APLICADO AQUI: Campos Início e Fim sem setas e somente números */}
                   <div>
                     <label className="block text-sm font-medium text-text-muted mb-1">Início (segundos)</label>
-                    <input type="number" name="start_segundos" min="0" max={formData.duracao_segundos} value={formData.start_segundos} onChange={handleFormChange} className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white" />
+                    <input 
+                      type="text" 
+                      name="start_segundos" 
+                      inputMode="numeric"
+                      value={formData.start_segundos} 
+                      onChange={(e) => {
+                        const onlyNums = e.target.value.replace(/\D/g, '');
+                        setFormData(prev => ({ ...prev, start_segundos: onlyNums }));
+                      }} 
+                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white" 
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-text-muted mb-1">Fim (segundos)</label>
-                    <input type="number" name="end_segundos" min="0" max={formData.duracao_segundos} value={formData.end_segundos} onChange={handleFormChange} className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white" />
+                    <input 
+                      type="text" 
+                      name="end_segundos" 
+                      inputMode="numeric"
+                      value={formData.end_segundos} 
+                      onChange={(e) => {
+                        const onlyNums = e.target.value.replace(/\D/g, '');
+                        setFormData(prev => ({ ...prev, end_segundos: onlyNums }));
+                      }} 
+                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white" 
+                    />
                   </div>
                 </div>
                 <div className="col-span-1">

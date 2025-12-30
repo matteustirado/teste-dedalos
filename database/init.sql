@@ -1,19 +1,16 @@
 USE radio_dedalos;
 
--- =======================================================
--- 1. LIMPEZA (Remove tabelas antigas para recriar do zero)
--- =======================================================
+-- 1. LIMPEZA TOTAL (Para garantir que recrie do zero sem erros)
+SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS jukebox_pedidos;
 DROP TABLE IF EXISTS agendamentos;
 DROP TABLE IF EXISTS radio_config;
 DROP TABLE IF EXISTS playlists;
 DROP TABLE IF EXISTS tracks;
+SET FOREIGN_KEY_CHECKS = 1;
 
--- =======================================================
 -- 2. CRIAÇÃO DAS TABELAS
--- =======================================================
 
--- Tabela de Músicas
 CREATE TABLE tracks (
   id INT AUTO_INCREMENT PRIMARY KEY,
   youtube_id VARCHAR(50) NOT NULL UNIQUE,
@@ -35,18 +32,16 @@ CREATE TABLE tracks (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela de Playlists
 CREATE TABLE playlists (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(100) NOT NULL,
   descricao TEXT,
   imagem VARCHAR(255),
-  tracks_ids JSON, -- Array de IDs das músicas
+  tracks_ids JSON,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Tabela de Agendamentos (Grade de Horários)
 CREATE TABLE agendamentos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   data_agendamento DATE NOT NULL,
@@ -63,31 +58,23 @@ CREATE TABLE agendamentos (
   CONSTRAINT uq_data_slot UNIQUE (data_agendamento, slot_index)
 );
 
--- Tabela de Pedidos da Jukebox (ATUALIZADA)
 CREATE TABLE jukebox_pedidos (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  track_id INT NULL,                 -- Pode ser NULL se for uma Sugestão manual
+  track_id INT NULL,                 -- CORREÇÃO: Permite NULL para sugestões
   pulseira_id VARCHAR(100) NOT NULL,
   unidade VARCHAR(50) NOT NULL,
-  termo_busca VARCHAR(255) NULL,     -- Salva o texto digitado na sugestão
-  status ENUM('PENDENTE', 'TOCADO', 'VETADO', 'SUGERIDA') NOT NULL DEFAULT 'PENDENTE',
+  termo_busca VARCHAR(255) NULL,     -- CORREÇÃO: Nova coluna para o texto da sugestão
+  status ENUM('PENDENTE', 'TOCADO', 'VETADO', 'SUGERIDA') NOT NULL DEFAULT 'PENDENTE', -- CORREÇÃO: Novo status
   pedido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   tocado_em TIMESTAMP NULL,
   FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
 );
 
--- Tabela de Configurações Gerais
 CREATE TABLE radio_config (
   config_key VARCHAR(50) NOT NULL PRIMARY KEY UNIQUE,
   config_value JSON NOT NULL
 );
 
--- =======================================================
--- 3. DADOS INICIAIS (SEED)
--- =======================================================
-
-INSERT INTO radio_config (config_key, config_value)
-VALUES ('commercial_track_ids', '[]');
-
-INSERT INTO radio_config (config_key, config_value)
-VALUES ('fallback_playlist_ids', '{"DOMINGO": 1, "SEGUNDA": 1, "TERCA": 1, "QUARTA": 1, "QUINTA": 1, "SEXTA": 1, "SABADO": 1}');
+-- 3. DADOS INICIAIS
+INSERT INTO radio_config (config_key, config_value) VALUES ('commercial_track_ids', '[]');
+INSERT INTO radio_config (config_key, config_value) VALUES ('fallback_playlist_ids', '{"DOMINGO": 1, "SEGUNDA": 1, "TERCA": 1, "QUARTA": 1, "QUINTA": 1, "SEXTA": 1, "SABADO": 1}');

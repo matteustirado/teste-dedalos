@@ -25,11 +25,9 @@ export default function Jukebox() {
   const [isCodeError, setIsCodeError] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   
-  // ESTADOS DE FEEDBACK
   const [requestStatus, setRequestStatus] = useState('IDLE'); 
   const [refusalReason, setRefusalReason] = useState('');
 
-  // Dropdown Control
   const [showDropdown, setShowDropdown] = useState(false);
   
   const searchInputRef = useRef(null);
@@ -39,7 +37,6 @@ export default function Jukebox() {
   const currentDayIndex = new Date().getDay();
   const currentDayName = useMemo(() => DAYS_TRANSLATION[currentDayIndex], [currentDayIndex]);
 
-  // Função auxiliar para recarregar as músicas
   const fetchTracks = () => {
       axios.get(`${API_URL}/api/tracks`).then(res => {
           const validTracks = res.data.filter(t => t.status_processamento === 'PROCESSADO' && !t.is_commercial);
@@ -96,7 +93,6 @@ export default function Jukebox() {
     const newSocket = io(API_URL);
     setSocket(newSocket);
 
-    // Carrega as músicas inicialmente
     fetchTracks();
 
     const fetchTheme = async () => {
@@ -118,26 +114,42 @@ export default function Jukebox() {
     };
     fetchTheme();
 
-    // Listeners do Socket
     newSocket.on('maestro:estadoCompleto', (estado) => { setMusicaAtual(estado.musicaAtual); });
     newSocket.on('maestro:tocarAgora', ({ musicaInfo }) => { setMusicaAtual(musicaInfo); });
     newSocket.on('maestro:filaAtualizada', (novaFila) => { setFila(novaFila || []); });
-
-    // NOVO: Atualiza a lista quando o backend avisa que o acervo mudou
+    
     newSocket.on('acervo:atualizado', () => {
-        console.log("Acervo atualizado! Recarregando lista...");
         fetchTracks();
     });
 
+    // --- OUVINTES DE RESPOSTA (Corrige o giro infinito) ---
+    
+    // 1. Pedido Aceito (Música da Lista)
     newSocket.on('jukebox:pedidoAceito', () => {
-        setIsValidating(false);
+        setIsValidating(false); // Para o spinner
         setRequestStatus('SUCCESS_REQUEST');
         setTimeout(() => resetForm(), 5000);
     });
 
+    // 2. Sugestão Aceita (Manual)
+    newSocket.on('jukebox:sugestaoAceita', () => {
+        setIsValidating(false); // Para o spinner
+        setRequestStatus('SUCCESS_SUGGESTION');
+        setTimeout(() => resetForm(), 5000);
+    });
+
+    // 3. Pedido Recusado (Já tocando/fila cheia/vetado)
     newSocket.on('jukebox:pedidoRecusado', ({ motivo }) => {
         setIsValidating(false);
         setRefusalReason(motivo || 'Pedido não pôde ser processado.');
+        setRequestStatus('ERROR_REFUSED');
+        setTimeout(() => resetForm(), 6000);
+    });
+
+    // 4. Erro Genérico (Limite spam, erros de banco)
+    newSocket.on('jukebox:erroPedido', ({ message }) => {
+        setIsValidating(false);
+        setRefusalReason(message || 'Erro desconhecido.');
         setRequestStatus('ERROR_REFUSED');
         setTimeout(() => resetForm(), 6000);
     });
@@ -195,7 +207,7 @@ export default function Jukebox() {
 
   const handleSubmit = async () => {
     setIsCodeError(false);
-    setIsValidating(true);
+    setIsValidating(true); // Inicia spinner
 
     try {
         const isValid = await validateCustomerCode(customerCode, unitLabel);
@@ -221,10 +233,7 @@ export default function Jukebox() {
                     pulseiraId: customerCode,
                     unidade: unitLabel
                 });
-                
-                setIsValidating(false);
-                setRequestStatus('SUCCESS_SUGGESTION');
-                setTimeout(() => resetForm(), 5000);
+                // REMOVIDO: A atualização otimista aqui. Agora espera 'jukebox:sugestaoAceita'
             }
         }
     } catch (error) {
@@ -233,6 +242,7 @@ export default function Jukebox() {
     }
   };
 
+  // --- RENDERIZAÇÃO DE FEEDBACK ---
   if (requestStatus !== 'IDLE') {
       let icon = '';
       let colorClass = '';
@@ -350,7 +360,8 @@ export default function Jukebox() {
 
         {/* === DIREITA === */}
         <div className="col-span-7 flex flex-col gap-8 h-full">
-            <div className="liquid-glass p-8 rounded-3xl shadow-lg flex-shrink-0">
+            {/* CARD DE BUSCA - Z-INDEX 50 */}
+            <div className="liquid-glass p-8 rounded-3xl shadow-lg flex-shrink-0 relative z-50">
                 <h2 className="text-3xl font-bold text-white mb-6 flex items-center gap-3">
                     <span className="material-symbols-outlined text-primary text-4xl">search</span> Pedir Música
                 </h2>

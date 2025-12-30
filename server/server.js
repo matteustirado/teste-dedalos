@@ -14,6 +14,7 @@ import { Server } from 'socket.io';
 import { iniciarMaestro, setOverlayRadio } from './src/controllers/conductorController.js'; 
 import multer from 'multer'; 
 import fs from 'fs'; 
+import { initIO } from './src/socket.js'; // NOVO IMPORT
 
 dotenv.config()
 
@@ -29,6 +30,9 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"]
   }
 });
+
+// INICIALIZA O SOCKET NO ARQUIVO SEPARADO
+initIO(io);
 
 const port = process.env.PORT || 4000
 
@@ -89,23 +93,20 @@ app.get('/', async (req, res) => {
   }
 })
 
-// === CORREÇÃO IMPORTANTE AQUI ===
 io.on('connection', (socket) => {
-  
-  // 1. Listener para SUGESTÕES manuais
+  // Listener para SUGESTÕES manuais
   socket.on('jukebox:enviarSugestao', (data) => {
       import('./src/controllers/jukeboxController.js').then(ctrl => {
           ctrl.handleReceberSugestao(socket, data);
       }).catch(err => console.error("Erro ao carregar controller de sugestão:", err));
   });
 
-  // 2. Listener para PEDIDOS NORMAIS (Faltava isso!)
+  // Listener para PEDIDOS NORMAIS
   socket.on('jukebox:adicionarPedido', (data) => {
       import('./src/controllers/jukeboxController.js').then(ctrl => {
           ctrl.handleAdicionarPedido(socket, data);
       }).catch(err => console.error("Erro ao carregar controller de pedido:", err));
   });
-
 });
 
 iniciarMaestro();
@@ -113,5 +114,3 @@ iniciarMaestro();
 httpServer.listen(port, () => {
   console.log(`Backend rodando (com Socket.io) na porta ${port}`)
 })
-
-export { io }

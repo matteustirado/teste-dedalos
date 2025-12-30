@@ -2,6 +2,7 @@ import pool from '../config/db.js'
 import axios from 'axios'
 import YtDlpWrap from 'yt-dlp-wrap'
 import ffmpeg from 'fluent-ffmpeg'
+import { getIO } from '../socket.js'; // ALTERAÇÃO: Importa o socket corretamente
 
 const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/videos'
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY
@@ -152,6 +153,9 @@ const analyzeLoudness = async (trackId, youtubeId) => {
       [loudness, trackId]
     )
     console.log(`[Loudness] Sucesso (Track ${trackId}): ${loudness} LUFS`)
+    
+    // ALTERAÇÃO: Atualiza a lista na tela quando terminar de processar
+    try { getIO().emit('acervo:atualizado'); } catch(e) {}
 
   } catch (err) {
     console.error(`[Loudness] Falha (Track ${trackId}):`, err.message)
@@ -160,6 +164,8 @@ const analyzeLoudness = async (trackId, youtubeId) => {
         'UPDATE tracks SET status_processamento = "ERRO" WHERE id = ?',
         [trackId]
       )
+      // ALTERAÇÃO: Atualiza a lista na tela em caso de erro também
+      try { getIO().emit('acervo:atualizado'); } catch(e) {}
     } catch (dbError) {
       console.error(`[Loudness] Falha ao marcar ERRO no DB (Track ${trackId}):`, dbError.message)
     }
@@ -227,6 +233,9 @@ export const addTrack = async (req, res) => {
 
     const [result] = await pool.query('INSERT INTO tracks SET ?', newTrack)
 
+    // ALTERAÇÃO: Emite evento para atualizar o frontend
+    getIO().emit('acervo:atualizado');
+
     res.status(201).json({ message: 'Música adicionada! Iniciando análise de áudio.', id: result.insertId })
 
     analyzeLoudness(result.insertId, youtube_id)
@@ -255,8 +264,6 @@ const safeJsonParse = (input) => {
     return [];
   }
 };
-
-
 
 export const listTracks = async (req, res) => {
   try {
@@ -310,7 +317,6 @@ export const updateTrack = async (req, res) => {
      stringifiedDiasSemana = JSON.stringify(ALL_DAYS_ARRAY);
   }
 
-
   try {
     const fieldsToUpdate = {
       titulo,
@@ -333,6 +339,9 @@ export const updateTrack = async (req, res) => {
         return res.status(404).json({ error: 'Música não encontrada para atualização.' });
     }
 
+    // ALTERAÇÃO: Emite evento para atualizar o frontend
+    getIO().emit('acervo:atualizado');
+
     res.json({ message: 'Música atualizada com sucesso!' });
 
   } catch (err) {
@@ -348,6 +357,10 @@ export const deleteTrack = async (req, res) => {
     if (result.affectedRows === 0) {
         return res.status(404).json({ error: 'Música não encontrada para deletar.' });
     }
+    
+    // ALTERAÇÃO: Emite evento para atualizar o frontend
+    getIO().emit('acervo:atualizado');
+
     res.json({ message: 'Música deletada com sucesso!' });
   } catch (err) {
     console.error(`deleteTrack (ID: ${id}) - Erro:`, err);
@@ -381,6 +394,9 @@ export const deleteMultipleTracks = async (req, res) => {
     );
     
     await connection.commit();
+    
+    // ALTERAÇÃO: Emite evento para atualizar o frontend
+    getIO().emit('acervo:atualizado');
     
     console.log(`Excluídas ${result.affectedRows} faixas.`);
     res.json({ message: `${result.affectedRows} mídias foram excluídas com sucesso!` });
