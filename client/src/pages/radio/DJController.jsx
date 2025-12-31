@@ -103,14 +103,14 @@ const ProgressBar = ({ progresso, crossfadeInfo }) => {
 
 export default function DJController() {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null); // Ref para o input de arquivo
+  const fileInputRef = useRef(null); 
   
   const [socket, setSocket] = useState(null);
   const [musicaAtual, setMusicaAtual] = useState(null);
   const [fila, setFila] = useState([]);
   const [progresso, setProgresso] = useState({ tempoAtual: 0, tempoTotal: 0 });
   const [isConnected, setIsConnected] = useState(false);
-  const [activeOverlay, setActiveOverlay] = useState(null); // Estado para saber se tem overlay
+  const [activeOverlay, setActiveOverlay] = useState(null); 
   
   const [isMuted, setIsMuted] = useState(() => {
       return localStorage.getItem('dedalos_local_mute') === 'true';
@@ -138,7 +138,7 @@ export default function DJController() {
             tempoTotal: estado.musicaAtual ? (estado.musicaAtual.end_segundos ?? estado.musicaAtual.duracao_segundos) : 0
         });
         setCrossfadeInfo(null);
-        setActiveOverlay(estado.overlayUrl); // Recebe overlay atual
+        setActiveOverlay(estado.overlayUrl); 
     });
     
     newSocket.on('maestro:filaAtualizada', (novaFila) => { setFila(novaFila || []); });
@@ -163,7 +163,6 @@ export default function DJController() {
         setCrossfadeInfo(null);
     });
 
-    // Escuta atualização de overlay em tempo real
     newSocket.on('maestro:overlayAtualizado', (url) => {
         setActiveOverlay(url);
     });
@@ -194,7 +193,6 @@ export default function DJController() {
       window.dispatchEvent(new Event('storage'));
   }
 
-  // --- LÓGICA DE UPLOAD DE OVERLAY ---
   const handleOverlayClick = () => {
       fileInputRef.current.click();
   }
@@ -215,12 +213,11 @@ export default function DJController() {
           console.error(err);
           toast.error("Erro ao enviar marca d'água.");
       }
-      // Limpa o input
       e.target.value = null;
   }
 
   const handleRemoveOverlay = async (e) => {
-      e.preventDefault(); // Previne abrir o seletor de arquivos se clicar com botão direito
+      e.preventDefault();
       e.stopPropagation();
       if(window.confirm("Remover marca d'água da tela?")) {
         try {
@@ -231,7 +228,6 @@ export default function DJController() {
         }
       }
   }
-  // ------------------------------------
   
   const handleCarregarPlaylist = (playlistId) => {
       if (socket) socket.emit('dj:carregarPlaylistManual', playlistId);
@@ -243,14 +239,29 @@ export default function DJController() {
   
   const handleVeto = (itemId) => { if (socket && itemId) { socket.emit('dj:vetarPedido', itemId); } }
   
+  // --- HELPER TAGS PADRONIZADO (CORES CORRIGIDAS) ---
   const getTagInfo = (item) => {
-       switch (item.tipo) {
-           case 'COMERCIAL_MANUAL': return { text: 'COMERCIAL', color: 'bg-yellow-500/20 text-yellow-400' };
-           case 'DJ_PEDIDO': return { text: 'DJ', color: 'bg-blue-500/20 text-blue-400' };
-           case 'JUKEBOX': return { text: item.unidade || 'JUKEBOX', color: 'bg-green-500/20 text-green-400' };
-           case 'PLAYLIST': return { text: 'PLAYLIST', color: 'bg-purple-500/20 text-purple-400' };
-           default: return { text: '??', color: 'bg-gray-500/20 text-gray-400' };
+       // 1. Comercial (Laranja)
+       if (item.tipo === 'COMERCIAL_MANUAL' || item.is_commercial) {
+           return { text: 'COMERCIAL', color: 'bg-orange-500/20 text-orange-400' };
        }
+       
+       // 2. DJ (Azul)
+       if (item.tipo === 'DJ_PEDIDO' || item.tipo === 'DJ') {
+           return { text: 'DJ', color: 'bg-blue-500/20 text-blue-400' };
+       }
+
+       // 3. Jukebox (SP=Verde, BH=Amarelo)
+       if (item.unidade || item.tipo === 'JUKEBOX') {
+           const u = (item.unidade || '').toUpperCase();
+           if (u === 'BH') return { text: 'BH', color: 'bg-yellow-500/20 text-yellow-400' };
+           if (u === 'SP') return { text: 'SP', color: 'bg-green-500/20 text-green-400' };
+           // Default para SP (Verde)
+           return { text: u || 'JUKEBOX', color: 'bg-green-500/20 text-green-400' };
+       }
+
+       // 4. Playlist (Roxo)
+       return { text: 'PLAYLIST', color: 'bg-purple-500/20 text-purple-400' };
   }
   
   const acervoFiltrado = useMemo(() => {
@@ -266,13 +277,12 @@ export default function DJController() {
       <Sidebar 
         activePage="dj" 
         headerTitle="Painel do DJ" 
-        headerIcon="radio"
+        headerIcon="album"
         headerExtra={
             <span className={`absolute bottom-0 right-0 block h-3.5 w-3.5 rounded-full border-2 border-bg-dark-primary ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></span>
         }
       />
       
-      {/* Input Oculto para Upload */}
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -323,12 +333,11 @@ export default function DJController() {
                             <span className="material-symbols-outlined text-2xl">skip_next</span>
                           </button>
 
-                          {/* BOTÃO DE OVERLAY (MARCA D'ÁGUA) */}
                           <div className="h-8 w-px bg-white/10 mx-1"></div>
                           
                           <button 
                             onClick={handleOverlayClick}
-                            onContextMenu={handleRemoveOverlay} // Clique direito para remover
+                            onContextMenu={handleRemoveOverlay} 
                             className={`flex shrink-0 items-center justify-center rounded-full w-10 h-10 transition-colors ${activeOverlay ? 'bg-blue-500 text-white hover:bg-blue-600' : 'text-white hover:text-blue-400'}`}
                             title="Adicionar Marca D'água (Overlay) - Clique Direito para remover"
                           >

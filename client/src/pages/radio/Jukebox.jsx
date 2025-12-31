@@ -9,6 +9,30 @@ const INACTIVITY_TIMEOUT_MS = 20000;
 const DAYS_TRANSLATION = ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'];
 const SHORT_DAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
+// --- HELPER DE TAGS PADRONIZADO ---
+const getTagInfo = (item) => {
+    // 1. Comercial (Laranja)
+    if (item.tipo === 'COMERCIAL_MANUAL' || item.is_commercial) {
+        return { text: 'COMERCIAL', color: 'bg-orange-500/20 text-orange-400' };
+    }
+    
+    // 2. DJ (Azul)
+    if (item.tipo === 'DJ_PEDIDO' || item.tipo === 'DJ') {
+        return { text: 'DJ', color: 'bg-blue-500/20 text-blue-400' };
+    }
+
+    // 3. Jukebox (SP=Verde, BH=Amarelo)
+    if (item.unidade || item.tipo === 'JUKEBOX') {
+        const u = (item.unidade || '').toUpperCase();
+        if (u === 'BH') return { text: 'BH', color: 'bg-yellow-500/20 text-yellow-400' };
+        // SP (Padrão Verde)
+        return { text: u || 'SP', color: 'bg-green-500/20 text-green-400' };
+    }
+
+    // 4. Playlist (Roxo)
+    return { text: 'PLAYLIST', color: 'bg-purple-500/20 text-purple-400' };
+};
+
 export default function Jukebox() {
   const { unidade } = useParams();
   const unitLabel = unidade ? unidade.toUpperCase() : 'SP';
@@ -122,8 +146,6 @@ export default function Jukebox() {
         fetchTracks();
     });
 
-    // --- OUVINTES DE RESPOSTA ---
-    
     newSocket.on('jukebox:pedidoAceito', () => {
         setIsValidating(false); 
         setRequestStatus('SUCCESS_REQUEST');
@@ -237,6 +259,13 @@ export default function Jukebox() {
     }
   };
 
+  const playlistCoverUrl = useMemo(() => {
+      if (!playlistDoDia?.imagem) return 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=2070&auto=format&fit=crop';
+      return playlistDoDia.imagem.startsWith('http') 
+          ? playlistDoDia.imagem 
+          : `${API_URL}${playlistDoDia.imagem}`;
+  }, [playlistDoDia]);
+
   if (requestStatus !== 'IDLE') {
       let icon = '';
       let colorClass = '';
@@ -269,16 +298,16 @@ export default function Jukebox() {
 
       return (
           <div className="h-screen w-screen bg-gradient-warm flex flex-col items-center justify-center p-8 text-center animate-fade-in select-none">
-              <div className={`w-32 h-32 rounded-full flex items-center justify-center mb-6 shadow-2xl bg-white/10 backdrop-blur-lg border border-white/10`}>
-                  <span className={`material-symbols-outlined text-7xl ${colorClass} drop-shadow-lg`}>{icon}</span>
+              <div className={`w-28 h-28 rounded-full flex items-center justify-center mb-4 shadow-2xl bg-white/10 backdrop-blur-lg border border-white/10`}>
+                  <span className={`material-symbols-outlined text-6xl ${colorClass} drop-shadow-lg`}>{icon}</span>
               </div>
-              <h1 className="text-4xl font-bold text-white mb-3 tracking-wide">
+              <h1 className="text-3xl font-bold text-white mb-2 tracking-wide">
                   {title}
               </h1>
-              <p className="text-2xl text-white/80 max-w-4xl leading-relaxed">
+              <p className="text-lg text-white/80 max-w-2xl leading-relaxed">
                   {message}
               </p>
-              <button onClick={resetForm} className="mt-10 bg-white/10 text-white px-8 py-3 rounded-xl hover:bg-white/20 transition-colors font-bold uppercase tracking-wider text-sm border border-white/10">
+              <button onClick={resetForm} className="mt-6 bg-white/10 text-white px-8 py-2 rounded-xl hover:bg-white/20 transition-colors font-bold uppercase tracking-wider text-sm border border-white/10">
                   {buttonText}
               </button>
           </div>
@@ -288,83 +317,84 @@ export default function Jukebox() {
   return (
     <div className="h-screen w-screen bg-gradient-warm p-8 flex flex-col overflow-hidden select-none text-white">
       
-      <div className="grid grid-cols-12 gap-8 h-full">
+      <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
         
-        {/* === ESQUERDA === */}
-        <div className="col-span-5 flex flex-col gap-8 h-full">
+        <div className="col-span-5 flex flex-col gap-6 h-full min-h-0">
             
-            <div className="liquid-glass p-6 rounded-3xl relative overflow-hidden group flex-shrink-0">
-                 <div className="flex justify-between items-start mb-6">
+            <div className="liquid-glass p-4 rounded-3xl relative overflow-hidden group flex-shrink-0">
+                 <div className="flex justify-between items-start mb-2">
                      <div className="flex items-center gap-2 bg-black/30 rounded-lg p-1">
-                         <div className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${unitLabel === 'SP' ? 'bg-primary text-white shadow-lg' : 'text-white/30'}`}>SP</div>
-                         <div className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${unitLabel === 'BH' ? 'bg-primary text-white shadow-lg' : 'text-white/30'}`}>BH</div>
+                         <div className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${unitLabel === 'SP' ? 'bg-primary text-white shadow-lg' : 'text-white/30'}`}>SP</div>
+                         <div className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${unitLabel === 'BH' ? 'bg-primary text-white shadow-lg' : 'text-white/30'}`}>BH</div>
                      </div>
-                     <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-green-400 tracking-wider uppercase opacity-80">No Ar</span>
-                        <div className="relative flex h-3 w-3">
+                     <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold text-green-400 tracking-wider uppercase opacity-80">No Ar</span>
+                        <div className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500 shadow-[0_0_10px_#4ade80]"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500 shadow-[0_0_8px_#4ade80]"></span>
                         </div>
                      </div>
                  </div>
                  
-                 <div className="flex gap-5 items-center">
-                     <div className="w-24 h-24 rounded-full border-4 border-white/10 shadow-2xl overflow-hidden flex-shrink-0 bg-black relative flex items-center justify-center">
+                 <div className="flex gap-3 items-center">
+                     <div className="w-14 h-14 rounded-full border-2 border-white/10 shadow-xl overflow-hidden flex-shrink-0 bg-black relative flex items-center justify-center">
                         <div className="w-full h-full animate-spin-slow flex items-center justify-center">
                             <img src={musicaAtual?.thumbnail_url || 'https://placehold.co/150/111/333'} className="w-full h-full object-cover scale-[1.7]" alt="Vinil" />
                         </div>
                         <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/10 to-transparent pointer-events-none z-10"></div>
-                        <div className="absolute w-2 h-2 bg-black rounded-full z-20 border border-white/20"></div>
+                        <div className="absolute w-1.5 h-1.5 bg-black rounded-full z-20 border border-white/20"></div>
                      </div>
-                     <div className="min-w-0 pr-2">
-                         <p className="text-white text-xl font-bold leading-tight line-clamp-2 drop-shadow-md">{musicaAtual?.titulo || 'Rádio Dedalos'}</p>
-                         <p className="text-primary text-sm font-bold mt-1 truncate">{musicaAtual?.artista || 'Conectado'}</p>
+                     <div className="min-w-0 pr-1">
+                         <p className="text-white text-base font-bold leading-tight line-clamp-2 drop-shadow-md">{musicaAtual?.titulo || 'Rádio Dedalos'}</p>
+                         <p className="text-primary text-xs font-bold mt-0.5 truncate">{musicaAtual?.artista || 'Conectado'}</p>
                      </div>
                  </div>
             </div>
 
-            <div className="liquid-glass p-6 rounded-3xl flex-1 flex flex-col min-h-0">
-                <h3 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <div className="liquid-glass p-4 rounded-3xl flex-1 flex flex-col min-h-0">
+                <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-sm">queue_music</span> Próximas
                 </h3>
-                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
-                    {fila.slice(0, 8).map((item, idx) => (
-                        <div key={`${item.id}-${idx}`} className="flex items-center gap-4 p-3 bg-white/5 rounded-xl border border-white/5 shadow-sm">
-                            <span className="text-white/20 font-mono text-sm w-4 text-center">{idx + 1}</span>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-white font-medium text-sm truncate">{item.titulo}</p>
-                                <div className="flex items-center justify-between mt-1">
-                                    <p className="text-white/40 text-[10px] truncate max-w-[60%]">{item.artista || 'Desconhecido'}</p>
-                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide ${item.unidade === 'SP' ? 'bg-blue-500/20 text-blue-300' : item.unidade === 'BH' ? 'bg-yellow-500/20 text-yellow-300' : item.tipo === 'DJ' ? 'bg-purple-500/20 text-purple-300' : 'bg-white/10 text-white/40'}`}>
-                                        {item.tipo === 'DJ_PEDIDO' ? 'DJ' : (item.unidade || 'AUTO')}
-                                    </span>
+                {/* ALTERAÇÃO AQUI: Lista limitada a 5 e sem rolagem */}
+                <div className="flex-1 overflow-hidden space-y-2">
+                    {fila.slice(0, 5).map((item, idx) => {
+                        const tag = getTagInfo(item);
+                        return (
+                            <div key={`${item.id}-${idx}`} className="flex items-center gap-3 p-2 bg-white/5 rounded-lg border border-white/5 shadow-sm">
+                                <span className="text-white/20 font-mono text-xs w-3 text-center">{idx + 1}</span>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-white font-medium text-xs truncate">{item.titulo}</p>
+                                    <div className="flex items-center justify-between mt-0.5">
+                                        <p className="text-white/40 text-[9px] truncate max-w-[60%]">{item.artista || 'Desconhecido'}</p>
+                                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${tag.color}`}>
+                                            {tag.text}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                     {fila.length === 0 && (
                         <div className="h-full flex flex-col items-center justify-center opacity-30">
-                            <span className="material-symbols-outlined text-4xl mb-2">playlist_add</span>
-                            <p className="text-xs text-center">Fila vazia.<br/>Peça sua música!</p>
+                            <span className="material-symbols-outlined text-3xl mb-1">playlist_add</span>
+                            <p className="text-[10px] text-center">Fila vazia.<br/>Peça sua música!</p>
                         </div>
                     )}
                 </div>
             </div>
         </div>
 
-        {/* === DIREITA === */}
-        <div className="col-span-7 flex flex-col gap-8 h-full">
-            {/* CARD DE BUSCA - Z-INDEX 50 */}
-            <div className="liquid-glass p-8 rounded-3xl shadow-lg flex-shrink-0 relative z-50">
-                <h2 className="text-3xl font-bold text-white mb-6 flex items-center gap-3">
-                    <span className="material-symbols-outlined text-primary text-4xl">search</span> Pedir Música
+        <div className="col-span-7 flex flex-col gap-6 h-full min-h-0">
+            <div className="liquid-glass p-5 rounded-3xl shadow-lg flex-shrink-0 relative z-50">
+                <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-2xl">search</span> Pedir Música
                 </h2>
                 
-                <div ref={searchContainerRef} className="relative mb-6">
+                <div ref={searchContainerRef} className="relative mb-3">
                     <input 
                         ref={searchInputRef}
                         type="text" 
-                        className="w-full bg-black/30 border border-white/10 rounded-2xl py-4 pl-6 pr-4 text-lg text-white placeholder:text-white/30 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                        className="w-full bg-black/30 border border-white/10 rounded-xl py-2 pl-4 pr-3 text-base text-white placeholder:text-white/30 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
                         placeholder="Buscar música ou artista..."
                         value={searchTerm}
                         onFocus={() => setShowDropdown(true)} 
@@ -376,7 +406,7 @@ export default function Jukebox() {
                     />
                     
                     {searchTerm && !selectedTrack && showDropdown && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden max-h-56 overflow-y-auto custom-scrollbar">
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden max-h-48 overflow-y-auto custom-scrollbar">
                             {availableTracks.length > 0 ? (
                                 availableTracks.map(track => {
                                     const isAvailableToday = Array.isArray(track.dias_semana) && track.dias_semana.includes(currentDayIndex);
@@ -385,26 +415,26 @@ export default function Jukebox() {
                                         <div 
                                             key={track.id} 
                                             onClick={() => handleSelectTrack(track)} 
-                                            className={`flex items-center gap-4 p-4 border-b border-white/5 last:border-0 transition-all
+                                            className={`flex items-center gap-3 p-3 border-b border-white/5 last:border-0 transition-all
                                                 ${isAvailableToday ? 'hover:bg-white/10 cursor-pointer' : 'opacity-40 cursor-not-allowed grayscale-[0.5]'}
                                             `}
                                         >
-                                            <div className="w-10 h-10 rounded-lg bg-white/10 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                            <div className="w-8 h-8 rounded-md bg-white/10 flex-shrink-0 overflow-hidden flex items-center justify-center">
                                                 <img src={track.thumbnail_url} className="w-full h-full object-cover scale-[1.7]" alt="" />
                                             </div>
                                             
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-white text-base font-medium truncate">{track.titulo}</p>
-                                                <p className="text-white/40 text-xs truncate">{track.artista}</p>
+                                                <p className="text-white text-sm font-medium truncate">{track.titulo}</p>
+                                                <p className="text-white/40 text-[10px] truncate">{track.artista}</p>
                                             </div>
                                             
-                                            <div className="flex gap-1 ml-3 flex-shrink-0">
+                                            <div className="flex gap-1 ml-2 flex-shrink-0">
                                                 {SHORT_DAYS.map((dayName, idx) => {
                                                     const isDayActive = Array.isArray(track.dias_semana) && track.dias_semana.includes(idx);
                                                     if (!isDayActive) return null;
                                                     const isToday = idx === currentDayIndex;
                                                     return (
-                                                        <span key={idx} className={`text-[10px] font-bold px-1.5 py-0.5 rounded border 
+                                                        <span key={idx} className={`text-[8px] font-bold px-1 py-0.5 rounded border 
                                                             ${isToday ? 'bg-green-500/20 text-green-400 border-green-500/30 shadow-[0_0_8px_rgba(74,222,128,0.2)]' : 'bg-white/5 text-white/30 border-white/10'}
                                                         `}>
                                                             {dayName}
@@ -414,68 +444,73 @@ export default function Jukebox() {
                                             </div>
 
                                             {isAvailableToday && (
-                                                <span className="material-symbols-outlined text-primary ml-3">add</span>
+                                                <span className="material-symbols-outlined text-primary ml-2 text-sm">add</span>
                                             )}
                                         </div>
                                     );
                                 })
                             ) : (
-                                <div className="p-6 text-center text-white/40 text-sm">
-                                    <p>Nenhuma música encontrada hoje.</p>
-                                    <p className="text-xs mt-1">Preencha o código abaixo para enviar como sugestão.</p>
+                                <div className="p-4 text-center text-white/40 text-xs">
+                                    <p>Nenhuma música encontrada.</p>
+                                    <p className="text-[10px] mt-1">Digite o código abaixo.</p>
                                 </div>
                             )}
                         </div>
                     )}
                 </div>
                 
-                <div className="flex gap-4">
-                    <div className="w-40">
-                        {/* ALTERAÇÃO AQUI: Mudado para 'text' e adicionado replace(/\D/g, '') */}
+                <div className="flex gap-3">
+                    <div className="w-32">
                         <input 
                             type="text" 
                             inputMode="numeric"
-                            className={`w-full bg-black/30 border rounded-2xl py-4 px-2 text-xl text-white placeholder:text-white/20 focus:outline-none text-center font-mono tracking-widest ${isCodeError ? 'border-red-500 animate-shake' : 'border-white/10 focus:border-primary'}`}
+                            className={`w-full bg-black/30 border rounded-xl py-2 px-2 text-lg text-white placeholder:text-white/20 focus:outline-none text-center font-mono tracking-widest ${isCodeError ? 'border-red-500 animate-shake' : 'border-white/10 focus:border-primary'}`}
                             placeholder="CÓDIGO"
                             value={customerCode}
                             onChange={(e) => setCustomerCode(e.target.value.replace(/\D/g, ''))}
                         />
                     </div>
+                    
                     <button 
                         onClick={handleSubmit}
                         disabled={!customerCode || isValidating}
-                        className={`flex-1 rounded-2xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all active:scale-95 ${selectedTrack ? 'bg-gradient-to-r from-primary to-orange-600 text-white hover:shadow-primary/40' : 'bg-white/10 text-white hover:bg-white/20 border border-white/5'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                        className={`flex-1 rounded-xl font-bold text-sm shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 ${selectedTrack ? 'bg-gradient-to-r from-primary to-orange-600 text-white hover:shadow-primary/40' : 'bg-white/10 text-white hover:bg-white/20 border border-white/5'} disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                         {isValidating ? (
-                            <span className="material-symbols-outlined animate-spin text-2xl">refresh</span>
-                        ) : selectedTrack ? 'CONFIRMAR PEDIDO' : 'ENVIAR SUGESTÃO'}
+                            <span className="material-symbols-outlined animate-spin text-xl">refresh</span>
+                        ) : selectedTrack ? 'PEDIR MÚSICA' : 'ENVIAR SUGESTÃO'}
                     </button>
                 </div>
             </div>
 
-            <div className="liquid-glass p-0 rounded-3xl flex-1 flex min-h-0 bg-[#0e0e0e] border border-white/5 overflow-hidden relative">
-                <div className="absolute top-0 right-0 h-full aspect-square z-0">
+            <div className="liquid-glass p-0 rounded-3xl flex-1 flex min-h-0 h-40 lg:h-auto bg-[#0e0e0e] border border-white/5 overflow-hidden relative">
+                
+                <div className="absolute top-0 right-0 h-full aspect-square z-0 max-w-[50%] lg:max-w-none">
                     <img 
-                        src={playlistDoDia?.capa_url || 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=2070&auto=format&fit=crop'} 
+                        src={playlistCoverUrl} 
                         alt="Capa da Playlist" 
-                        className="w-full h-full object-cover"
-                        style={{ maskImage: 'linear-gradient(to right, transparent 0%, black 100%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 100%)' }}
+                        className="w-full h-full object-cover object-center" 
+                        style={{ 
+                            maskImage: 'linear-gradient(to right, transparent 0%, black 100%)', 
+                            WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 100%)',
+                            aspectRatio: '1/1'
+                        }}
                     />
                 </div>
-                <div className="relative z-20 flex-1 p-8 flex flex-col justify-center max-w-[70%]">
-                    <span className="inline-block px-3 py-1 rounded bg-primary/20 text-primary text-xs font-bold uppercase tracking-widest self-start mb-3 border border-primary/20">
+                <div className="relative z-20 flex-1 p-5 flex flex-col justify-center max-w-[70%]">
+                    <span className="inline-block px-2 py-0.5 rounded bg-primary/20 text-primary text-[9px] font-bold uppercase tracking-widest self-start mb-2 border border-primary/20">
                         {currentDayName}
                     </span>
-                    <h2 className="text-3xl font-bold text-white leading-tight mb-3 drop-shadow-lg">
+                    <h2 className="text-xl font-bold text-white leading-tight mb-2 drop-shadow-lg truncate">
                         {playlistDoDia ? playlistDoDia.nome : 'Seleção Especial'}
                     </h2>
-                    <p className="text-white/80 text-sm leading-relaxed line-clamp-2 mb-4 drop-shadow-md">
-                        {playlistDoDia ? playlistDoDia.descricao : 'Uma curadoria exclusiva de músicas selecionadas para criar a atmosfera perfeita para sua noite.'}
+                    <p className="text-white/80 text-[10px] leading-relaxed line-clamp-2 mb-3 drop-shadow-md">
+                        {playlistDoDia ? playlistDoDia.descricao : 'Curadoria exclusiva para sua noite.'}
                     </p>
                     {topArtistasPlaylist.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1">
                             {topArtistasPlaylist.map((artista, i) => (
-                                <span key={i} className="px-2 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-white/90 text-[10px] font-bold uppercase tracking-wide shadow-sm">
+                                <span key={i} className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-white/90 text-[8px] font-bold uppercase tracking-wide shadow-sm">
                                     {artista}
                                 </span>
                             ))}
@@ -484,6 +519,10 @@ export default function Jukebox() {
                 </div>
             </div>
         </div>
+      </div>
+
+      <div className="mt-4 text-center text-[10px] text-text-muted pb-0">
+          <p>© Developed by: <span className="text-primary font-semibold">Matteus Tirado</span></p>
       </div>
 
       <style>{`
