@@ -7,6 +7,7 @@ import trackRoutes from './src/routes/trackRoutes.js'
 import playlistRoutes from './src/routes/playlistRoutes.js'
 import scheduleRoutes from './src/routes/scheduleRoutes.js'
 import jukeboxRoutes from './src/routes/jukeboxRoutes.js' 
+import toolsRoutes from './src/routes/toolsRoutes.js' // <--- [ADICIONADO]
 import path from 'path' 
 import { fileURLToPath } from 'url'; 
 import { createServer } from 'http';
@@ -14,7 +15,7 @@ import { Server } from 'socket.io';
 import { iniciarMaestro, setOverlayRadio } from './src/controllers/conductorController.js'; 
 import multer from 'multer'; 
 import fs from 'fs'; 
-import { initIO } from './src/socket.js'; // NOVO IMPORT
+import { initIO } from './src/socket.js'; 
 
 dotenv.config()
 
@@ -31,7 +32,7 @@ const io = new Server(httpServer, {
   }
 });
 
-// INICIALIZA O SOCKET NO ARQUIVO SEPARADO
+// INICIALIZA O SOCKET
 initIO(io);
 
 const port = process.env.PORT || 4000
@@ -67,6 +68,7 @@ app.use('/api/tracks', trackRoutes)
 app.use('/api/playlists', playlistRoutes)
 app.use('/api/agendamentos', scheduleRoutes)
 app.use('/api/jukebox', jukeboxRoutes) 
+app.use('/api/tools', toolsRoutes) // <--- [ADICIONADO] ESTA LINHA É ESSENCIAL
 
 // --- ROTA DE UPLOAD DE OVERLAY ---
 app.post('/api/overlay', upload.single('overlay'), (req, res) => {
@@ -94,14 +96,12 @@ app.get('/', async (req, res) => {
 })
 
 io.on('connection', (socket) => {
-  // Listener para SUGESTÕES manuais
   socket.on('jukebox:enviarSugestao', (data) => {
       import('./src/controllers/jukeboxController.js').then(ctrl => {
           ctrl.handleReceberSugestao(socket, data);
       }).catch(err => console.error("Erro ao carregar controller de sugestão:", err));
   });
 
-  // Listener para PEDIDOS NORMAIS
   socket.on('jukebox:adicionarPedido', (data) => {
       import('./src/controllers/jukeboxController.js').then(ctrl => {
           ctrl.handleAdicionarPedido(socket, data);

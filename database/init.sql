@@ -2,6 +2,7 @@ USE radio_dedalos;
 
 -- 1. LIMPEZA TOTAL (Para garantir que recrie do zero sem erros)
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS historico_promocoes;
 DROP TABLE IF EXISTS jukebox_pedidos;
 DROP TABLE IF EXISTS agendamentos;
 DROP TABLE IF EXISTS radio_config;
@@ -60,11 +61,11 @@ CREATE TABLE agendamentos (
 
 CREATE TABLE jukebox_pedidos (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  track_id INT NULL,                 -- CORREÇÃO: Permite NULL para sugestões
+  track_id INT NULL,                
   pulseira_id VARCHAR(100) NOT NULL,
   unidade VARCHAR(50) NOT NULL,
-  termo_busca VARCHAR(255) NULL,     -- CORREÇÃO: Nova coluna para o texto da sugestão
-  status ENUM('PENDENTE', 'TOCADO', 'VETADO', 'SUGERIDA') NOT NULL DEFAULT 'PENDENTE', -- CORREÇÃO: Novo status
+  termo_busca VARCHAR(255) NULL,    
+  status ENUM('PENDENTE', 'TOCADO', 'VETADO', 'SUGERIDA') NOT NULL DEFAULT 'PENDENTE', 
   pedido_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   tocado_em TIMESTAMP NULL,
   FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
@@ -73,6 +74,18 @@ CREATE TABLE jukebox_pedidos (
 CREATE TABLE radio_config (
   config_key VARCHAR(50) NOT NULL PRIMARY KEY UNIQUE,
   config_value JSON NOT NULL
+);
+
+-- [NOVO] TABELA DE HISTÓRICO DE PROMOÇÕES (Quinta Premiada, etc)
+CREATE TABLE historico_promocoes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  tipo VARCHAR(50) NOT NULL, -- ex: 'QUINTA_PREMIADA'
+  unidade VARCHAR(10) NOT NULL, -- 'SP' ou 'BH'
+  data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  total_sorteados INT,
+  total_resgatados INT,
+  detalhes JSON, -- Armazena o array do sorteio como JSON
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. DADOS INICIAIS

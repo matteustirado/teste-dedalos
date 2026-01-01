@@ -4,15 +4,14 @@ import { useNavigate } from 'react-router-dom'
 export default function Home() {
   const navigate = useNavigate()
   
-  // Estados das seções (iniciam minimizados)
   const [expandedSections, setExpandedSections] = useState({ 
     radio: false, 
-    maintenance: false,
+    maintenanceSP: false,
+    maintenanceBH: false,
     cx: false 
   })
 
   const radioTools = [
-    // Ícone alterado para 'album' (CD/Vinil)
     { id: 'dj-controller', name: 'Painel do DJ', icon: 'album', path: '/radio/dj' },
     { id: 'collection', name: 'Acervo de Músicas', icon: 'music_video', path: '/radio/collection' },
     { id: 'playlist-creator', name: 'Criar Playlists', icon: 'playlist_add', path: '/radio/playlist-creator' },
@@ -21,14 +20,19 @@ export default function Home() {
     { id: 'go-live', name: 'Ao Vivo', icon: 'sensors', path: 'EXTERNAL_WATCH' }
   ]
 
-  const maintenanceTools = [
-    { id: 'quinta-premiada', name: 'Quinta Premiada', icon: 'stars', path: '/tools/quinta-premiada' },
-    { id: 'tabela-precos', name: 'Tabela de Preços', icon: 'price_change', path: '/tools/tabela-precos' },
-    { id: 'placar-dedalos', name: 'Placar Dedalos', icon: 'scoreboard', path: '/tools/placar' }
+  const maintenanceToolsSP = [
+    { id: 'quinta-premiada-sp', name: 'Quinta Premiada', icon: 'stars', path: '/tools/thursday/sp' },
+    { id: 'tabela-precos-sp', name: 'Tabela de Preços', icon: 'price_change', path: '/tools/prices/sp/view' },
+    { id: 'placar-dedalos-sp', name: 'Placar Dedalos', icon: 'scoreboard', path: '/tools/scoreboard/sp/display' }
+  ]
+
+  const maintenanceToolsBH = [
+    { id: 'quinta-premiada-bh', name: 'Quinta Premiada', icon: 'stars', path: '/tools/thursday/bh' },
+    { id: 'tabela-precos-bh', name: 'Tabela de Preços', icon: 'price_change', path: '/tools/prices/bh/view' },
+    { id: 'placar-dedalos-bh', name: 'Placar Dedalos', icon: 'scoreboard', path: '/tools/scoreboard/bh/display' }
   ]
 
   const cxTools = [
-    // Ícone alterado para 'thumb_up' (Polegar)
     { id: 'pesquisa-satisfacao', name: 'Pesquisa de Satisfação', icon: 'thumb_up', path: '/cx/pesquisa' },
     { id: 'avaliacoes', name: 'Avaliações', icon: 'reviews', path: '/cx/avaliacoes' }
   ]
@@ -105,40 +109,81 @@ export default function Home() {
             )}
           </div>
 
-          {/* === SEÇÃO 2: FERRAMENTAS DE MANUTENÇÃO === */}
-          <div className="liquid-glass rounded-xl p-6">
-            <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('maintenance')}>
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-3xl text-white">build_circle</span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Ferramentas de Manutenção</h2>
-                  <p className="text-text-muted text-sm">Utilitários e painéis gerais</p>
-                </div>
-              </div>
-              <span className={`material-symbols-outlined text-white text-3xl transition-transform ${expandedSections.maintenance ? 'rotate-180' : ''}`}>expand_more</span>
-            </div>
-            
-            {expandedSections.maintenance && (
-              <div className="grid grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/10 animate-fade-in-down">
-                {maintenanceTools.map((tool) => (
-                  <div 
-                    key={tool.id} 
-                    onClick={() => handleToolClick(tool.path)} 
-                    className={`liquid-glass rounded-xl p-6 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group`}
-                  >
-                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform`}>
-                      <span className="material-symbols-outlined text-2xl text-white">{tool.icon}</span>
+          {/* === SEÇÃO 2: MANUTENÇÃO (GRID DE 2 COLUNAS) === */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* MANUTENÇÃO SP */}
+              <div className="liquid-glass rounded-xl p-6">
+                <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('maintenanceSP')}>
+                  <div className="flex items-center gap-4">
+                    {/* Ícone Azul para SP */}
+                    <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-3xl text-white">build_circle</span>
                     </div>
-                    <h3 className="text-base font-bold text-white text-center">{tool.name}</h3>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">Manutenção SP</h2>
+                      <p className="text-text-muted text-sm">Unidade São Paulo</p>
+                    </div>
                   </div>
-                ))}
+                  <span className={`material-symbols-outlined text-white text-3xl transition-transform ${expandedSections.maintenanceSP ? 'rotate-180' : ''}`}>expand_more</span>
+                </div>
+                
+                {expandedSections.maintenanceSP && (
+                  <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/10 animate-fade-in-down">
+                    {maintenanceToolsSP.map((tool) => (
+                      <div 
+                        key={tool.id} 
+                        onClick={() => handleToolClick(tool.path)} 
+                        className={`liquid-glass rounded-xl p-4 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group`}
+                      >
+                        <div className={`w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center mb-3 mx-auto group-hover:scale-110 transition-transform`}>
+                          <span className="material-symbols-outlined text-xl text-white">{tool.icon}</span>
+                        </div>
+                        <h3 className="text-sm font-bold text-white text-center">{tool.name}</h3>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* MANUTENÇÃO BH */}
+              <div className="liquid-glass rounded-xl p-6">
+                <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('maintenanceBH')}>
+                  <div className="flex items-center gap-4">
+                    {/* Ícone Azul para BH tambem (ALTERADO para Azul conforme pedido) */}
+                    <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-3xl text-white">build_circle</span>
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">Manutenção BH</h2>
+                      <p className="text-text-muted text-sm">Unidade Belo Horizonte</p>
+                    </div>
+                  </div>
+                  <span className={`material-symbols-outlined text-white text-3xl transition-transform ${expandedSections.maintenanceBH ? 'rotate-180' : ''}`}>expand_more</span>
+                </div>
+                
+                {expandedSections.maintenanceBH && (
+                  <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/10 animate-fade-in-down">
+                    {maintenanceToolsBH.map((tool) => (
+                      <div 
+                        key={tool.id} 
+                        onClick={() => handleToolClick(tool.path)} 
+                        className={`liquid-glass rounded-xl p-4 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group`}
+                      >
+                        {/* Ícones internos também Azuis para BH */}
+                        <div className={`w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center mb-3 mx-auto group-hover:scale-110 transition-transform`}>
+                          <span className="material-symbols-outlined text-xl text-white">{tool.icon}</span>
+                        </div>
+                        <h3 className="text-sm font-bold text-white text-center">{tool.name}</h3>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
           </div>
 
-          {/* === SEÇÃO 3: EXPERIÊNCIA DO CLIENTE (CX) === */}
+          {/* === SEÇÃO 3: CX === */}
           <div className="liquid-glass rounded-xl p-6">
             <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('cx')}>
               <div className="flex items-center gap-4">

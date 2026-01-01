@@ -1,61 +1,65 @@
-import React from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-// Importação das Páginas
-import Home from './pages/Home'
-import DJController from './pages/radio/DJController'
-import MusicCollection from './pages/radio/MusicCollection'
-import PlaylistCreator from './pages/radio/PlaylistCreator'
-import Library from './pages/radio/Library'
-import Schedule from './pages/radio/Schedule'
-import WatchVideo from './pages/radio/WatchVideo'
-import Jukebox from './pages/radio/Jukebox'
+// Páginas Gerais
+import Home from './pages/Home';
 
-// NOVA PÁGINA: Histórico de Pedidos
-import RequestHistory from './pages/radio/RequestHistory'
+// Rádio Dedalos
+import DJController from './pages/radio/DJController';
+import MusicCollection from './pages/radio/MusicCollection';
+import PlaylistCreator from './pages/radio/PlaylistCreator';
+import Library from './pages/radio/Library';
+import Schedule from './pages/radio/Schedule';
+import WatchVideo from './pages/radio/WatchVideo';
+import Jukebox from './pages/radio/Jukebox';
+import RequestHistory from './pages/radio/RequestHistory'; // Se existir
+
+// Ferramentas de Manutenção
+import GoldenThursday from './pages/tools/GoldenThursday'; // Importação da Quinta Premiada
 
 function App() {
   return (
-    <Router>
-      {/* Container de notificações global */}
+    <BrowserRouter>
       <ToastContainer 
         position="top-right" 
         autoClose={3000} 
+        hideProgressBar={false} 
+        newestOnTop={false} 
+        closeOnClick 
+        rtl={false} 
+        pauseOnFocusLoss 
+        draggable 
+        pauseOnHover 
         theme="dark" 
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
       />
-
+      
       <Routes>
         {/* Home */}
         <Route path="/" element={<Home />} />
-        
-        {/* Ferramentas Administrativas da Rádio */}
+
+        {/* Rádio Dedalos */}
         <Route path="/radio/dj" element={<DJController />} />
         <Route path="/radio/collection" element={<MusicCollection />} />
         <Route path="/radio/playlist-creator" element={<PlaylistCreator />} />
-        <Route path="/radio/playlist-creator/:playlistId" element={<PlaylistCreator />} />
         <Route path="/radio/library" element={<Library />} />
         <Route path="/radio/schedule" element={<Schedule />} />
-        
-        {/* NOVA ROTA: Histórico de Pedidos */}
-        <Route path="/radio/requests-history" element={<RequestHistory />} />
-        
-        {/* Visualização Pública (TV/Telão) */}
         <Route path="/radio/watch" element={<WatchVideo />} />
+        
+        {/* Rotas Públicas da Jukebox */}
+        <Route path="/radio/jukebox" element={<Jukebox />} />
+        <Route path="/radio/jukebox/:unidade" element={<Jukebox />} />
 
-        {/* Interface do Cliente (Tablet) */}
-        <Route path="/jukebox/:unidade" element={<Jukebox />} />
+        {/* Ferramentas de Manutenção */}
+        <Route path="/tools/thursday/:unidade" element={<GoldenThursday />} />
+        
+        {/* Fallback para rota sem unidade, redirecionando ou abrindo padrão (opcional) */}
+        <Route path="/tools/thursday" element={<GoldenThursday />} />
+
       </Routes>
-    </Router>
-  )
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
