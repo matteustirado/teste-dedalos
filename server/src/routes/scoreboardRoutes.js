@@ -7,12 +7,25 @@ import {
     resetVotes, 
     savePreset, 
     getPresets, 
-    deletePreset 
+    deletePreset,
+    testarTrigger,
+    getCrowdCount // <--- [NOVO] Importando a função do Proxy
 } from '../controllers/scoreboardController.js';
 
 const router = express.Router();
 
-// Configuração Ativa
+// =====================================================================
+// 🌡️ ROTA DE TERMÔMETRO (PROXY)
+// =====================================================================
+// O Frontend chama essa rota, e o Backend busca na API Dedalos externa
+router.get('/crowd/:unidade', getCrowdCount);
+
+
+// =====================================================================
+// 🎮 ROTAS DE CONFIGURAÇÃO E JOGO
+// =====================================================================
+
+// Configuração Ativa (Game e Display)
 router.get('/active/:unidade', getActiveConfig);
 router.post('/active', updateActiveConfig);
 
@@ -21,9 +34,15 @@ router.post('/vote', castVote);
 router.get('/votes/:unidade', getVotes);
 router.post('/reset-votes', resetVotes);
 
-// Predefinições
+// Predefinições (Presets)
 router.get('/presets', getPresets);
 router.post('/presets', savePreset);
 router.delete('/presets/:id', deletePreset);
+
+// =====================================================================
+// 🧪 ROTA DE TESTES (ADMIN)
+// =====================================================================
+// Simula um check-in para testar a animação das telas
+router.get('/test-trigger/:unidade', testarTrigger);
 
 export default router;

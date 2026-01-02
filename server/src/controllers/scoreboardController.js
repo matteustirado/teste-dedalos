@@ -1,91 +1,184 @@
 import pool from '../config/db.js';
 import { getIO } from '../socket.js';
+import { io as ioClient } from 'socket.io-client';
 
 // =====================================================================
-// 📡 SENTINELA DE CHECK-INS (Monitoramento Ativo)
+// 🛠️ HELPER: Busca Dados na API Dedalos (Reutilizável / Proxy)
 // =====================================================================
+const fetchFromDedalos = async (unidade) => {
+    // Busca configs do ambiente apenas no momento da execução
+    const config = {
+        SP: { url: process.env.VITE_API_URL_SP, token: process.env.VITE_API_TOKEN_SP },
+        BH: { url: process.env.VITE_API_URL_BH, token: process.env.VITE_API_TOKEN_BH }
+    }[unidade.toUpperCase()];
 
-const CHECKIN_INTERVAL = 5000; // 5 segundos
-let lastCheckinCount = { SP: null, BH: null };
+    if (!config || !config.url) return null;
 
-// Configuração lida do .env do servidor (process.env)
-const SENTINELA_CONFIG = {
-    SP: {
-        url: process.env.VITE_API_URL_SP,
-        token: process.env.VITE_API_TOKEN_SP
-    },
-    BH: {
-        url: process.env.VITE_API_URL_BH,
-        token: process.env.VITE_API_TOKEN_BH
+    try {
+        const baseUrl = config.url.replace(/\/$/, "");
+        
+        // 1. Tenta endpoint direto de contador (se existir na sua API)
+        let endpoint = `${baseUrl}/api/contador/`;
+        let response = await fetch(endpoint, { headers: { "Authorization": `Token ${config.token}` } });
+        
+        // 2. Fallback: Se não achar contador, busca entradas do dia e conta o tamanho do array
+        if (!response.ok) {
+            const dataHoje = new Date().toISOString().split('T')[0];
+            endpoint = `${baseUrl}/api/entradasPorData/${dataHoje}`;
+            response = await fetch(endpoint, { headers: { "Authorization": `Token ${config.token}` } });
+        }
+
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Lógica para extrair o número dependendo do formato da resposta
+            if (Array.isArray(data)) {
+                // Se for [{contador: 100}], retorna 100. Se for lista de entradas, retorna length.
+                if (data.length > 0 && data[0].contador !== undefined) return data[0].contador;
+                return data.length;
+            } else if (data.results) {
+                return data.results.length;
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error(`[Dedalos API] Erro ao buscar dados de ${unidade}:`, error.message);
+        return null;
     }
 };
 
+// =====================================================================
+// 🔌 PONTE WEBSOCKET (Conexão em Tempo Real com Heroku)
+// =====================================================================
+const EXTERNAL_SOCKETS = {
+    SP: 'https://placar-80b3f72889ba.herokuapp.com/',
+    BH: 'https://placarbh-cf51a4a5b78a.herokuapp.com/'
+};
+
+const iniciarPonteRealTime = () => {
+    console.log("🌉 Iniciando Ponte Real-Time com servidores externos...");
+
+    Object.entries(EXTERNAL_SOCKETS).forEach(([unidade, url]) => {
+        try {
+            console.log(`[Ponte ${unidade}] Conectando a ${url}...`);
+            
+            const socket = ioClient(url, {
+                transports: ['websocket', 'polling']
+            });
+
+            socket.on('connect', () => {
+                console.log(`✅ [Ponte ${unidade}] Conectado ao servidor externo!`);
+            });
+
+            socket.on('disconnect', () => {
+                console.warn(`❌ [Ponte ${unidade}] Desconectado.`);
+            });
+
+            // GATILHO PRINCIPAL (Vem do Heroku)
+            socket.on('new_id', async (data) => {
+                console.log(`⚡ [Ponte ${unidade}] CHECK-IN DETECTADO!`);
+                
+                // Busca o total atualizado na API para enviar junto (evita delay no front)
+                const totalAtual = await fetchFromDedalos(unidade);
+                
+                const io = getIO();
+                io.emit('checkin:novo', { 
+                    unidade: unidade, 
+                    total: totalAtual, // Envia o total já mastigado
+                    origem: 'websocket_externo',
+                    timestamp: new Date()
+                });
+            });
+
+        } catch (error) {
+            console.error(`[Ponte ${unidade}] Erro ao inicializar socket:`, error);
+        }
+    });
+};
+
+// =====================================================================
+// 📡 SENTINELA (Backup via HTTP Polling)
+// =====================================================================
+const CHECKIN_INTERVAL = 10000; // 10 segundos (Backup pode ser mais lento)
+let lastCheckinCount = { SP: null, BH: null };
+
 const iniciarSentinela = () => {
-    console.log("📡 Sentinela de Check-ins iniciado...");
+    console.log("📡 Sentinela (Backup HTTP) iniciado...");
 
     setInterval(async () => {
-        const unidades = ['SP', 'BH'];
+        for (const unidade of ['SP', 'BH']) {
+            const totalAtual = await fetchFromDedalos(unidade);
 
-        for (const unidade of unidades) {
-            const config = SENTINELA_CONFIG[unidade];
-            // Se não tiver config no env, pula
-            if (!config || !config.url || !config.token) continue;
-
-            try {
-                // Formata data YYYY-MM-DD
-                const dataHoje = new Date().toISOString().split('T')[0];
-                
-                // Garante URL limpa e monta endpoint
-                const baseUrl = config.url.replace(/\/$/, "");
-                const endpoint = `${baseUrl}/api/entradasPorData/${dataHoje}`;
-
-                // Faz a requisição para a API externa
-                const response = await fetch(endpoint, {
-                    headers: { "Authorization": `Token ${config.token}` }
-                });
-
-                if (response.ok) {
-                    const dados = await response.json();
-                    // API Dedalos retorna array ou objeto com results
-                    const listaEntradas = Array.isArray(dados) ? dados : (dados.results || []);
-                    const totalAtual = listaEntradas.length;
-
-                    // 1. Primeira execução: Apenas define a linha de base
-                    if (lastCheckinCount[unidade] === null) {
-                        lastCheckinCount[unidade] = totalAtual;
-                        continue;
-                    }
-
-                    // 2. Detectou aumento (Novo Check-in!)
-                    if (totalAtual > lastCheckinCount[unidade]) {
-                        console.log(`🚨 [Sentinela] NOVO CHECK-IN DETECTADO EM ${unidade}! (${lastCheckinCount[unidade]} -> ${totalAtual})`);
-                        
-                        const io = getIO();
-                        
-                        // DISPARA EVENTO PARA O FRONTEND (GAME/DISPLAY)
-                        io.emit('checkin:novo', { 
-                            unidade: unidade, // 'SP' ou 'BH'
-                            total: totalAtual,
-                            timestamp: new Date()
-                        });
-
-                        lastCheckinCount[unidade] = totalAtual;
-                    }
+            if (totalAtual !== null) {
+                // 1. Define base inicial
+                if (lastCheckinCount[unidade] === null) {
+                    lastCheckinCount[unidade] = totalAtual;
+                    continue;
                 }
-            } catch (error) {
-                // Erros silenciosos de rede para não spamar o log
+
+                // 2. Detecta mudança (se o WebSocket falhou, o Sentinela pega)
+                if (totalAtual > lastCheckinCount[unidade]) {
+                    console.log(`🚨 [Sentinela] Diferença detectada em ${unidade}. Total: ${totalAtual}`);
+                    
+                    const io = getIO();
+                    io.emit('checkin:novo', { 
+                        unidade: unidade, 
+                        total: totalAtual,
+                        origem: 'sentinela_http',
+                        timestamp: new Date()
+                    });
+
+                    lastCheckinCount[unidade] = totalAtual;
+                }
             }
         }
     }, CHECKIN_INTERVAL);
 };
 
-// Inicia o loop assim que o arquivo é carregado
+// INICIALIZA OS SISTEMAS DE MONITORAMENTO
+iniciarPonteRealTime();
 iniciarSentinela();
 
 
 // =====================================================================
-// 🎮 CONTROLLERS DO SCOREBOARD (MANTIDOS IGUAIS)
+// 🎮 CONTROLLERS DO SCOREBOARD
 // =====================================================================
+
+// [NOVO] Rota Proxy para o Frontend buscar contagem sem erro de CORS
+export const getCrowdCount = async (req, res) => {
+    const { unidade } = req.params;
+    const count = await fetchFromDedalos(unidade);
+    
+    if (count !== null) {
+        res.json({ count });
+    } else {
+        // Não quebra o front, apenas retorna null ou erro tratável
+        res.status(500).json({ error: "Erro ao buscar contagem no Dedalos" });
+    }
+};
+
+// Rota de Teste Manual
+export const testarTrigger = (req, res) => {
+    const { unidade } = req.params;
+    const unidadeUpper = unidade ? unidade.toUpperCase() : 'SP';
+    
+    try {
+        const io = getIO();
+        console.log(`🧪 [TESTE] Disparo manual para ${unidadeUpper}...`);
+        
+        io.emit('checkin:novo', { 
+            unidade: unidadeUpper,
+            total: 999, 
+            novos: 1,
+            timestamp: new Date()
+        });
+
+        res.json({ message: `Teste enviado para ${unidadeUpper}` });
+    } catch (error) {
+        console.error("Erro teste:", error);
+        res.status(500).json({ error: "Erro interno." });
+    }
+};
 
 export const getActiveConfig = async (req, res) => {
     const { unidade } = req.params;
@@ -98,23 +191,18 @@ export const getActiveConfig = async (req, res) => {
         
         res.json(config);
     } catch (err) {
-        console.error("Erro ao buscar config ativa:", err);
+        console.error("Erro config:", err);
         res.status(500).json({ error: err.message });
     }
 };
 
 export const updateActiveConfig = async (req, res) => {
     const { unidade, titulo, layout, opcoes, status } = req.body;
-    
-    if (!unidade || !titulo || !opcoes) {
-        return res.status(400).json({ error: "Dados incompletos." });
-    }
+    if (!unidade || !titulo || !opcoes) return res.status(400).json({ error: "Dados incompletos." });
 
     const connection = await pool.getConnection();
-
     try {
         await connection.beginTransaction();
-
         const opcoesString = JSON.stringify(opcoes);
         const unidadeUpper = unidade.toUpperCase();
 
@@ -122,26 +210,23 @@ export const updateActiveConfig = async (req, res) => {
             INSERT INTO scoreboard_active (unidade, titulo, layout, opcoes, status)
             VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
-            titulo = VALUES(titulo),
-            layout = VALUES(layout),
-            opcoes = VALUES(opcoes),
-            status = VALUES(status)
+            titulo = VALUES(titulo), layout = VALUES(layout), opcoes = VALUES(opcoes), status = VALUES(status)
         `;
 
         await connection.query(sql, [unidadeUpper, titulo, layout, opcoesString, status]);
+        // Zera votos ao mudar a configuração (opcional, mas recomendado)
         await connection.query('DELETE FROM scoreboard_votes WHERE unidade = ?', [unidadeUpper]);
+        
         await connection.commit();
 
         const io = getIO();
         io.emit('scoreboard:config_updated', { unidade: unidadeUpper });
         io.emit('scoreboard:vote_updated', { unidade: unidadeUpper, votes: [] });
 
-        console.log(`[Scoreboard] Configuração atualizada e votos zerados para ${unidadeUpper}`);
-        res.json({ message: "Placar atualizado e votos reiniciados com sucesso!" });
-
+        res.json({ message: "Placar atualizado!" });
     } catch (err) {
         await connection.rollback();
-        console.error("Erro ao atualizar placar:", err);
+        console.error("Erro update:", err);
         res.status(500).json({ error: err.message });
     } finally {
         connection.release();
@@ -150,26 +235,18 @@ export const updateActiveConfig = async (req, res) => {
 
 export const castVote = async (req, res) => {
     const { unidade, optionIndex } = req.body;
-    const idx = optionIndex !== undefined ? optionIndex : null;
-
-    if (!unidade || idx === null) {
-        return res.status(400).json({ error: "Dados de voto inválidos." });
-    }
+    if (!unidade || optionIndex === undefined) return res.status(400).json({ error: "Voto inválido." });
 
     try {
-        await pool.query('INSERT INTO scoreboard_votes (unidade, option_index) VALUES (?, ?)', [unidade.toUpperCase(), idx]);
+        await pool.query('INSERT INTO scoreboard_votes (unidade, option_index) VALUES (?, ?)', [unidade.toUpperCase(), optionIndex]);
         
         const io = getIO();
-        const [rows] = await pool.query(
-            'SELECT option_index, COUNT(*) as count FROM scoreboard_votes WHERE unidade = ? GROUP BY option_index', 
-            [unidade.toUpperCase()]
-        );
+        // Retorna a contagem agrupada por índice
+        const [rows] = await pool.query('SELECT option_index, COUNT(*) as count FROM scoreboard_votes WHERE unidade = ? GROUP BY option_index', [unidade.toUpperCase()]);
         
         io.emit('scoreboard:vote_updated', { unidade: unidade.toUpperCase(), votes: rows });
-
         res.json({ message: "Voto computado." });
     } catch (err) {
-        console.error("Erro ao votar:", err);
         res.status(500).json({ error: err.message });
     }
 };
@@ -177,10 +254,7 @@ export const castVote = async (req, res) => {
 export const getVotes = async (req, res) => {
     const { unidade } = req.params;
     try {
-        const [rows] = await pool.query(
-            'SELECT option_index, COUNT(*) as count FROM scoreboard_votes WHERE unidade = ? GROUP BY option_index', 
-            [unidade.toUpperCase()]
-        );
+        const [rows] = await pool.query('SELECT option_index, COUNT(*) as count FROM scoreboard_votes WHERE unidade = ? GROUP BY option_index', [unidade.toUpperCase()]);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -202,35 +276,23 @@ export const resetVotes = async (req, res) => {
 export const savePreset = async (req, res) => {
     const { titulo_preset, titulo_placar, layout, opcoes } = req.body;
     try {
-        await pool.query(
-            'INSERT INTO scoreboard_presets (titulo_preset, titulo_placar, layout, opcoes) VALUES (?, ?, ?, ?)',
-            [titulo_preset, titulo_placar, layout, JSON.stringify(opcoes)]
-        );
-        res.json({ message: "Predefinição salva." });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+        await pool.query('INSERT INTO scoreboard_presets (titulo_preset, titulo_placar, layout, opcoes) VALUES (?, ?, ?, ?)', [titulo_preset, titulo_placar, layout, JSON.stringify(opcoes)]);
+        res.json({ message: "Preset salvo." });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 };
 
 export const getPresets = async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM scoreboard_presets ORDER BY id DESC');
-        const formatted = rows.map(r => ({
-            ...r,
-            opcoes: (typeof r.opcoes === 'string') ? JSON.parse(r.opcoes) : r.opcoes
-        }));
+        const formatted = rows.map(r => ({ ...r, opcoes: (typeof r.opcoes === 'string') ? JSON.parse(r.opcoes) : r.opcoes }));
         res.json(formatted);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 };
 
 export const deletePreset = async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM scoreboard_presets WHERE id = ?', [id]);
-        res.json({ message: "Predefinição excluída." });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+        res.json({ message: "Preset excluído." });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 };
