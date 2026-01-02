@@ -8,7 +8,7 @@ export default function Sidebar({
   headerExtra,
   isEditMode = false,
   group = 'radio',
-  unit = 'sp' // 'sp' ou 'bh'
+  unit // 'sp', 'bh' ou null
 }) {
   const navigate = useNavigate()
   
@@ -16,37 +16,42 @@ export default function Sidebar({
     window.open('/radio/watch', '_blank');
   }
 
+  // Lógica inteligente de Unidade:
+  // 1. Se 'unit' foi passada via prop (Maintenance), usa ela.
+  // 2. Se não (Radio), tenta pegar do localStorage (salvo na Home).
+  // 3. Se nada existir, assume 'sp'.
+  const savedUnit = localStorage.getItem('dedalos_active_unit');
+  const activeUnit = unit || savedUnit || 'sp';
+
   // Definição dos menus por grupo
   const menus = {
     radio: [
-      { id: 'home', label: 'Home', icon: 'home', path: '/' },
+      { id: 'home', label: 'Home', icon: 'home', path: activeUnit === 'bh' ? '/bh' : '/' },
       { id: 'dj', label: 'Painel do DJ', icon: 'album', path: '/radio/dj' },
-      { id: 'collection', label: 'Acervo', icon: 'music_video', path: '/radio/collection' }, // Texto encurtado
+      { id: 'collection', label: 'Acervo', icon: 'music_video', path: '/radio/collection' },
       { id: 'playlist-creator', label: 'Criar Playlist', icon: 'playlist_add', path: '/radio/playlist-creator' },
       { id: 'library', label: 'Biblioteca', icon: 'library_music', path: '/radio/library' },
       { id: 'schedule', label: 'Agendamento', icon: 'calendar_month', path: '/radio/schedule' },
-      { id: 'jukebox', label: 'Jukebox', icon: 'queue_music', path: '/radio/jukebox/sp' }, // Nova opção
+      // Jukebox usa a unidade ativa detectada
+      { id: 'jukebox', label: 'Jukebox', icon: 'queue_music', path: `/radio/jukebox/${activeUnit}` }, 
     ],
-    // Menu de Manutenção - AJUSTADO
     maintenance: [
-        { id: 'home', label: 'Home', icon: 'home', path: '/' },
+        { id: 'home', label: 'Home', icon: 'home', path: activeUnit === 'bh' ? '/bh' : '/' },
         
-        // Título da Categoria
         { type: 'label', label: 'QUINTA PREMIADA' },
-        // Item Renomeado
-        { id: 'thursday', label: 'Sorteador', icon: 'stars', path: `/tools/thursday/${unit}` },
+        { id: 'thursday', label: 'Sorteador', icon: 'stars', path: `/tools/thursday/${activeUnit}` },
         
         { type: 'label', label: 'TABELA DE PREÇOS' },
-        { id: 'prices-maintenance', label: 'Manutenção', icon: 'edit_note', path: `/tools/prices/${unit}/maintenance` },
-        { id: 'prices-view', label: 'Tabela', icon: 'table_view', path: `/tools/prices/${unit}/view` },
+        { id: 'prices-maintenance', label: 'Manutenção', icon: 'edit_note', path: `/tools/prices/${activeUnit}/maintenance` },
+        { id: 'prices-view', label: 'Tabela', icon: 'table_view', path: `/tools/prices/${activeUnit}/view` },
 
         { type: 'label', label: 'PLACAR DEDALOS' },
-        { id: 'scoreboard-maintenance', label: 'Manutenção', icon: 'settings_remote', path: `/tools/scoreboard/${unit}/maintenance` },
-        { id: 'scoreboard-display', label: 'Placar', icon: 'scoreboard', path: `/tools/scoreboard/${unit}/display` },
-        { id: 'scoreboard-game', label: 'Game', icon: 'sports_esports', path: `/tools/scoreboard/${unit}/game` },
+        { id: 'scoreboard-maintenance', label: 'Manutenção', icon: 'settings_remote', path: `/tools/scoreboard/maintenance/${activeUnit}` },
+        { id: 'scoreboard-display', label: 'Placar', icon: 'scoreboard', path: `/tools/scoreboard/display/${activeUnit}` },
+        { id: 'scoreboard-game', label: 'Game', icon: 'sports_esports', path: `/tools/scoreboard/game/${activeUnit}` },
     ],
     cx: [
-        { id: 'home', label: 'Home', icon: 'home', path: '/' },
+        { id: 'home', label: 'Home', icon: 'home', path: activeUnit === 'bh' ? '/bh' : '/' },
         { id: 'pesquisa-satisfacao', label: 'Pesquisa', icon: 'thumb_up', path: '/cx/pesquisa' },
         { id: 'avaliacoes', label: 'Avaliações', icon: 'reviews', path: '/cx/avaliacoes' }
     ]
@@ -74,7 +79,7 @@ export default function Sidebar({
           <div className="flex flex-col">
             <h1 className="text-white text-lg font-bold leading-tight">{headerTitle}</h1>
             <p className="text-text-muted text-xs uppercase tracking-wider">
-                {group === 'maintenance' ? `Unidade ${unit.toUpperCase()}` : 'Rádio Dedalos'}
+                {group === 'maintenance' ? `Unidade ${activeUnit.toUpperCase()}` : 'Rádio Dedalos'}
             </p>
           </div>
         </div>

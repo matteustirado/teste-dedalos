@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
-// Certifique-se que o caminho do SVG está correto
+// Certifique-se que o caminho do SVG está correto no seu projeto
 import LogoDedalos from '../assets/SVG/logoDedalos'; 
 
-// Configurações de API
+// Configurações de API (Extraídas do .env ou fallback)
 const API_CONFIG = {
     sp: {
-        baseUrl: "https://dedalosadm2-3dab78314381.herokuapp.com/",
-        couponsUrl: "https://dedalosadm2-3dab78314381.herokuapp.com/api/cupons/",
-        token: "7a9e64071564f6fee8d96cd209ed3a4e86801552",
+        baseUrl: import.meta.env.VITE_API_URL_SP || "https://dedalosadm2-3dab78314381.herokuapp.com/",
+        // Note: A URL de cupons geralmente é base + api/cupons/
+        couponsUrl: (import.meta.env.VITE_API_URL_SP || "https://dedalosadm2-3dab78314381.herokuapp.com/") + "api/cupons/",
+        token: import.meta.env.VITE_API_TOKEN_SP || "7a9e64071564f6fee8d96cd209ed3a4e86801552",
         local: "SP"
     },
     bh: {
-        baseUrl: "https://dedalosadm2bh-09d55dca461e.herokuapp.com/",
-        couponsUrl: "https://dedalosadm2bh-09d55dca461e.herokuapp.com/api/cupons/",
-        token: "919d97d7df39ecbd0036631caba657221acab99d",
+        baseUrl: import.meta.env.VITE_API_URL_BH || "https://dedalosadm2bh-09d55dca461e.herokuapp.com/",
+        couponsUrl: (import.meta.env.VITE_API_URL_BH || "https://dedalosadm2bh-09d55dca461e.herokuapp.com/") + "api/cupons/",
+        token: import.meta.env.VITE_API_TOKEN_BH || "919d97d7df39ecbd0036631caba657221acab99d",
         local: "BH"
     }
 };
@@ -62,7 +63,10 @@ export default function GiftList({ lockerNumber, onCancel, onConfirm, unit = 'sp
         setFormData(prev => ({ ...prev, nomeCliente: "Buscando..." }));
 
         try {
-            const endpoint = `${currentConfig.baseUrl}api/entradasOne/${pulseira}/`;
+            // Ajuste na concatenação da URL base com o endpoint
+            const baseUrl = currentConfig.baseUrl.endsWith('/') ? currentConfig.baseUrl : `${currentConfig.baseUrl}/`;
+            const endpoint = `${baseUrl}api/entradasOne/${pulseira}/`;
+            
             const response = await axios.get(endpoint, {
                 headers: { 
                     "Authorization": `Token ${currentConfig.token}`,

@@ -19,7 +19,8 @@ import RequestHistory from './pages/radio/RequestHistory';
 // Ferramentas de Manutenção
 import GoldenThursday from './pages/tools/GoldenThursday';
 import ScoreboardEdit from './pages/tools/ScoreboardEdit';
-import ScoreboardGame from './pages/tools/ScoreboardGame'; // <--- IMPORTAÇÃO NOVA
+import ScoreboardGame from './pages/tools/ScoreboardGame';
+import ScoreboardDisplay from './pages/tools/ScoreboardDisplay'; // <--- Importação Adicionada
 
 function App() {
   return (
@@ -38,8 +39,11 @@ function App() {
       />
       
       <Routes>
-        {/* Home */}
-        <Route path="/" element={<Home />} />
+        {/* === DASHBOARDS PRINCIPAIS === */}
+        {/* Rota Padrão (SP) */}
+        <Route path="/" element={<Home unit="sp" />} />
+        {/* Rota BH */}
+        <Route path="/bh" element={<Home unit="bh" />} />
 
         {/* Rádio Dedalos */}
         <Route path="/radio/dj" element={<DJController />} />
@@ -59,10 +63,8 @@ function App() {
         <Route path="/tools/thursday" element={<GoldenThursday />} />
 
         {/* Placar Dedalos (Scoreboard) */}
-        {/* Rota para edição/manutenção do placar */}
         <Route path="/tools/scoreboard/maintenance/:unidade" element={<ScoreboardEdit />} /> 
-        
-        {/* Rota para o JOGO (Tablet Cliente) */}
+        <Route path="/tools/scoreboard/display/:unidade" element={<ScoreboardDisplay />} /> {/* <--- Rota Adicionada */}
         <Route path="/tools/scoreboard/game/:unidade" element={<ScoreboardGame />} /> 
 
       </Routes>

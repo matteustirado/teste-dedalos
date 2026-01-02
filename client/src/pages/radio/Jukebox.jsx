@@ -2,34 +2,33 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { io } from 'socket.io-client';
-import { validateCustomerCode } from '../../utils/customerValidator';
 
 const API_URL = 'http://localhost:4000';
 const INACTIVITY_TIMEOUT_MS = 20000;
+const MASTER_CODE = '0108'; // Código mestre para testes/staff
+
 const DAYS_TRANSLATION = ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO'];
 const SHORT_DAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
-// --- HELPER DE TAGS PADRONIZADO ---
+// Configuração das APIs de Validação (Extraídas do .env)
+const VALIDATION_API = {
+    SP: import.meta.env.VITE_API_URL_SP || "https://dedalosadm2-3dab78314381.herokuapp.com/",
+    BH: import.meta.env.VITE_API_URL_BH || "https://dedalosadm2bh-09d55dca461e.herokuapp.com/"
+};
+
+// --- HELPER DE TAGS ---
 const getTagInfo = (item) => {
-    // 1. Comercial (Laranja)
     if (item.tipo === 'COMERCIAL_MANUAL' || item.is_commercial) {
         return { text: 'COMERCIAL', color: 'bg-orange-500/20 text-orange-400' };
     }
-    
-    // 2. DJ (Azul)
     if (item.tipo === 'DJ_PEDIDO' || item.tipo === 'DJ') {
         return { text: 'DJ', color: 'bg-blue-500/20 text-blue-400' };
     }
-
-    // 3. Jukebox (SP=Verde, BH=Amarelo)
     if (item.unidade || item.tipo === 'JUKEBOX') {
         const u = (item.unidade || '').toUpperCase();
         if (u === 'BH') return { text: 'BH', color: 'bg-yellow-500/20 text-yellow-400' };
-        // SP (Padrão Verde)
         return { text: u || 'SP', color: 'bg-green-500/20 text-green-400' };
     }
-
-    // 4. Playlist (Roxo)
     return { text: 'PLAYLIST', color: 'bg-purple-500/20 text-purple-400' };
 };
 
@@ -60,6 +59,35 @@ export default function Jukebox() {
 
   const currentDayIndex = new Date().getDay();
   const currentDayName = useMemo(() => DAYS_TRANSLATION[currentDayIndex], [currentDayIndex]);
+
+  // --- FUNÇÃO DE VALIDAÇÃO INTERNA ---
+  const validateCustomer = async (code) => {
+      if (!code) return false;
+      const cleanCode = code.toString().trim();
+
+      // 1. Validação Mestre
+      if (cleanCode === MASTER_CODE) return true;
+
+      // 2. Validação na API Externa (SP ou BH)
+      const baseUrl = VALIDATION_API[unitLabel] || VALIDATION_API.SP;
+      // Garante que a URL termine com / antes de concatenar, se necessário. 
+      // Mas o endpoint específico é /pesquisa/api/verificar_pulseira/
+      // Assumindo que o ENV traz a raiz (ex: https://site.com/), montamos a URL:
+      
+      // Nota: As variáveis do ENV geralmente vêm com a barra no final ou não. 
+      // Vamos garantir a formação correta.
+      const rootUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+      const url = `${rootUrl}pesquisa/api/verificar_pulseira/?id=${cleanCode.toUpperCase()}`;
+
+      try {
+          const response = await fetch(url);
+          // A API retorna 200 se a pulseira existe/é válida
+          return response.ok;
+      } catch (error) {
+          console.error(`Erro ao validar código na unidade ${unitLabel}:`, error);
+          return false;
+      }
+  };
 
   const fetchTracks = () => {
       axios.get(`${API_URL}/api/tracks`).then(res => {
@@ -228,7 +256,8 @@ export default function Jukebox() {
     setIsValidating(true);
 
     try {
-        const isValid = await validateCustomerCode(customerCode, unitLabel);
+        // Validação usando a função interna consolidada
+        const isValid = await validateCustomer(customerCode);
         
         if (!isValid) {
             setIsCodeError(true);
@@ -355,7 +384,7 @@ export default function Jukebox() {
                 <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-sm">queue_music</span> Próximas
                 </h3>
-                {/* ALTERAÇÃO AQUI: Lista limitada a 5 e sem rolagem */}
+                
                 <div className="flex-1 overflow-hidden space-y-2">
                     {fila.slice(0, 5).map((item, idx) => {
                         const tag = getTagInfo(item);

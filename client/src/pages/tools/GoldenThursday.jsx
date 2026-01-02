@@ -7,13 +7,14 @@ import GiftList from '../../components/GiftList';
 
 const API_URL = 'http://localhost:4000';
 
+// Configuração centralizada usando variáveis de ambiente
 const CONFIG = {
     sp: {
         name: 'São Paulo',
         totalLockers: 210,
         couponsToDraw: 50,
-        apiUrl: "https://dedalosadm2-3dab78314381.herokuapp.com/api/entradasCheckout/",
-        token: "7a9e64071564f6fee8d96cd209ed3a4e86801552",
+        apiUrl: import.meta.env.VITE_API_URL_SP || "https://dedalosadm2-3dab78314381.herokuapp.com/", 
+        token: import.meta.env.VITE_API_TOKEN_SP || "7a9e64071564f6fee8d96cd209ed3a4e86801552",
         broken: [209],
         ranges: {
             M: [1, 2, 3, 4, 5, 6, 21, 22, 23, 24, 25, 26, 41, 42, 43, 44, 45, 46, 61, 62, 63, 64, 65, 66, 81, 82, 83, 84, 85, 86, 191, 192, 193, 194, 195, 196],
@@ -25,8 +26,8 @@ const CONFIG = {
         name: 'Belo Horizonte',
         totalLockers: 160,
         couponsToDraw: 15,
-        apiUrl: "https://dedalosadm2bh-09d55dca461e.herokuapp.com/api/entradasCheckout/",
-        token: "919d97d7df39ecbd0036631caba657221acab99d",
+        apiUrl: import.meta.env.VITE_API_URL_BH || "https://dedalosadm2bh-09d55dca461e.herokuapp.com/",
+        token: import.meta.env.VITE_API_TOKEN_BH || "919d97d7df39ecbd0036631caba657221acab99d",
         broken: [17, 30, 36, 61],
         ranges: {
             M: [1, 2, 3, 4, 5, 6, 21, 22, 23, 24, 25, 26],
@@ -63,7 +64,7 @@ export default function GoldenThursday() {
     const [showFinalizeModal, setShowFinalizeModal] = useState(false);
     const [isFinalizing, setIsFinalizing] = useState(false);
     
-    // NOVO: Controle do Modal de Resgatados
+    // Controle do Modal de Resgatados
     const [showRedeemedModal, setShowRedeemedModal] = useState(false);
 
     // --- CARREGAR HISTÓRICO ---
@@ -104,7 +105,9 @@ export default function GoldenThursday() {
         const toastId = toast.loading("Consultando sistema de armários...");
 
         try {
-            const response = await fetch(config.apiUrl, { headers: { "Authorization": `Token ${config.token}` } });
+            const endpoint = config.apiUrl.includes('api/entradasCheckout') ? config.apiUrl : `${config.apiUrl}api/entradasCheckout/`;
+
+            const response = await fetch(endpoint, { headers: { "Authorization": `Token ${config.token}` } });
             if (response.status !== 200) throw new Error("Falha na API");
             
             const data = await response.json();
@@ -162,7 +165,8 @@ export default function GoldenThursday() {
         if (isMonitoring && currentDraw) {
             const check = async () => {
                 try {
-                    const response = await fetch(config.apiUrl, { headers: { "Authorization": `Token ${config.token}` } });
+                    const endpoint = config.apiUrl.includes('api/entradasCheckout') ? config.apiUrl : `${config.apiUrl}api/entradasCheckout/`;
+                    const response = await fetch(endpoint, { headers: { "Authorization": `Token ${config.token}` } });
                     const data = await response.json();
                     const currentOccupied = data.map(c => parseInt(c.armario)).filter(n => !isNaN(n));
                     setOccupiedLockers(currentOccupied);
@@ -261,7 +265,6 @@ export default function GoldenThursday() {
     const handlePrint = () => {
         if (!currentDraw) return;
         
-        // Filtra apenas os resgatados para o relatório
         const redeemedItems = currentDraw.filter(i => i.status === 'redeemed');
 
         const printWindow = window.open('', '', 'height=800,width=900');
@@ -293,7 +296,6 @@ export default function GoldenThursday() {
             printWindow.document.write('<p style="text-align:center; margin-top:50px;">Nenhum prêmio foi resgatado neste sorteio.</p>');
         } else {
             redeemedItems.forEach(item => {
-                // Formata os detalhes para quebra de linha visual na impressão
                 const formattedDetails = item.details ? item.details.replace(/ \| /g, '<br/>') : 'Sem detalhes adicionais';
                 
                 printWindow.document.write('<div class="item">');
@@ -337,7 +339,6 @@ export default function GoldenThursday() {
                             <span className="material-symbols-outlined">print</span> IMPRIMIR
                         </button>
                         
-                        {/* NOVO BOTÃO DE RESGATADOS */}
                         <button 
                             onClick={() => setShowRedeemedModal(true)} 
                             disabled={!currentDraw} 
@@ -415,7 +416,13 @@ export default function GoldenThursday() {
             {/* MODAL DE RESGATE DE PRÊMIOS (INPUT) */}
             {selectedLockerForPrize && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-                    <GiftList lockerNumber={selectedLockerForPrize.locker} onCancel={() => setSelectedLockerForPrize(null)} onConfirm={handleGiftConfirm} />
+                    {/* AQUI ESTÁ A CORREÇÃO: Passando 'unit={currentUnit}' */}
+                    <GiftList 
+                        lockerNumber={selectedLockerForPrize.locker} 
+                        onCancel={() => setSelectedLockerForPrize(null)} 
+                        onConfirm={handleGiftConfirm} 
+                        unit={currentUnit} 
+                    />
                 </div>
             )}
 
@@ -449,7 +456,6 @@ export default function GoldenThursday() {
                                         <div className="flex-1">
                                             <h3 className="text-white font-bold text-lg mb-1">{item.prize}</h3>
                                             <div className="flex flex-col gap-1 text-sm text-text-muted">
-                                                {/* Exibe os detalhes quebrando a string onde tiver | */}
                                                 {item.details && item.details.split(' | ').map((detail, idx) => (
                                                     <span key={idx} className="block">• {detail.trim()}</span>
                                                 ))}

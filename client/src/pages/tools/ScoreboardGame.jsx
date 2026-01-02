@@ -5,12 +5,6 @@ import { io } from 'socket.io-client';
 
 const LOCAL_API_URL = 'http://localhost:4000';
 
-// Endereços dos servidores LEGADOS que emitem o sinal da pulseira
-const EXTERNAL_SOCKETS = {
-    sp: 'https://placar-80b3f72889ba.herokuapp.com/',
-    bh: 'https://placarbh-cf51a4a5b78a.herokuapp.com/'
-};
-
 export default function ScoreboardGame() {
     const { unidade } = useParams();
     const currentUnit = unidade ? unidade.toLowerCase() : 'sp';
@@ -25,7 +19,7 @@ export default function ScoreboardGame() {
     const idleTimerRef = useRef(null);
     const successTimerRef = useRef(null);
 
-    // --- FUNÇÕES AUXILIARES DE FLUXO ---
+    // --- FUNÇÕES AUXILIARES ---
     
     const clearTimers = () => {
         if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -34,8 +28,7 @@ export default function ScoreboardGame() {
 
     const startVotingSession = () => {
         console.log("Iniciando Sessão de Votação...");
-        clearTimers(); // Limpa timers anteriores
-        
+        clearTimers();
         setViewState('voting');
 
         // REGRA 1: Se não votar em 20 segundos, volta para Idle
@@ -45,64 +38,43 @@ export default function ScoreboardGame() {
         }, 20000);
     };
 
-    // --- EFEITOS (CONEXÕES E CARREGAMENTO) ---
+    // --- EFEITOS ---
     useEffect(() => {
-        // 1. Busca configuração inicial
         fetchConfig();
 
-        // ---------------------------------------------------------
-        // CONEXÃO 1: BACKEND LOCAL (Para Config e Envio de Votos)
-        // ---------------------------------------------------------
+        // 1. CONEXÃO COM BACKEND LOCAL
+        // Agora o backend local atua como Sentinela e avisa sobre novos checkins
         const localSocket = io(LOCAL_API_URL);
         
-        localSocket.on('connect', () => console.log("[LOCAL] Conectado ao Backend Novo"));
+        localSocket.on('connect', () => console.log("[GAME] Conectado ao Backend Local"));
 
-        // Se o admin mudar o placar na sala de controle, atualiza aqui
+        // 2. Escuta Atualização de Configuração
         localSocket.on('scoreboard:config_updated', (data) => {
             if (data.unidade === currentUnit.toUpperCase()) {
-                console.log("[LOCAL] Configuração atualizada pelo Admin");
+                console.log("Configuração atualizada pelo admin.");
                 fetchConfig();
             }
         });
 
-        // ---------------------------------------------------------
-        // CONEXÃO 2: SERVIDOR EXTERNO (O GATILHO DA PULSEIRA)
-        // ---------------------------------------------------------
-        const externalUrl = EXTERNAL_SOCKETS[currentUnit] || EXTERNAL_SOCKETS.sp;
-        console.log(`[EXTERNO] Tentando conectar em: ${externalUrl}`);
-        
-        const externalSocket = io(externalUrl, {
-            transports: ['websocket', 'polling'], // Garante compatibilidade
-            reconnection: true,
-            reconnectionAttempts: Infinity,
+        // 3. Escuta GATILHO DE CHECK-IN (Enviado pelo Sentinela do Backend)
+        localSocket.on('checkin:novo', (data) => {
+            // Verifica se o check-in pertence a esta unidade
+            if (data && data.unidade && data.unidade.toLowerCase() === currentUnit) {
+                console.log('⚡ GATILHO "checkin:novo" RECEBIDO!', data);
+                
+                // Acorda a tela se estiver descansando
+                setViewState(currentState => {
+                    if (currentState === 'idle' || currentState === 'success') {
+                        startVotingSession();
+                        return 'voting';
+                    }
+                    return currentState;
+                });
+            }
         });
 
-        externalSocket.on('connect', () => {
-            console.log(`[EXTERNO] CONECTADO AO SERVIDOR DE CHECK-IN (${currentUnit.toUpperCase()})`);
-        });
-
-        externalSocket.on('connect_error', (err) => {
-            console.error('[EXTERNO] Erro de conexão:', err.message);
-        });
-        
-        // O EVENTO MÁGICO: 'new_id'
-        externalSocket.on('new_id', (data) => {
-            console.log('⚡ GATILHO "new_id" RECEBIDO!', data);
-            
-            // Verifica se já não estamos votando
-            setViewState(currentState => {
-                if (currentState === 'idle' || currentState === 'success') {
-                    startVotingSession(); // Dispara a tela de votação
-                    return 'voting';
-                }
-                return currentState;
-            });
-        });
-
-        // Cleanup ao desmontar
         return () => {
             localSocket.disconnect();
-            externalSocket.disconnect();
             clearTimers();
         };
     }, [currentUnit]);
@@ -117,19 +89,16 @@ export default function ScoreboardGame() {
         }
     };
 
-    // --- AÇÕES DO USUÁRIO ---
-
     const handleVote = async (index, optionName) => {
-        if (navigator.vibrate) navigator.vibrate(50); // Feedback tátil
-
-        // Usuário votou, cancela o timer de inatividade
-        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        if (navigator.vibrate) navigator.vibrate(50);
+        clearTimers(); // Limpa timer de inatividade ao votar
 
         try {
-            // Envia o voto para o SEU BACKEND NOVO
             await axios.post(`${LOCAL_API_URL}/api/scoreboard/vote`, {
                 unidade: currentUnit,
-                optionIndex: index
+                optionIndex: index,
+                optionLabel: optionName, 
+                pulseiraId: "GAME_TOTEM" 
             });
 
             setVotedOption(optionName);
@@ -143,51 +112,35 @@ export default function ScoreboardGame() {
 
         } catch (error) {
             console.error("Erro ao votar:", error);
-            // Fallback em caso de erro
             setTimeout(() => setViewState('idle'), 2000);
         }
     };
-
-    // --- RENDERIZAÇÃO ---
 
     if (loading) return <div className="min-h-screen bg-black" />;
 
     const gridCols = config?.opcoes.length <= 2 ? 'grid-cols-1' : 'grid-cols-2';
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white font-sans overflow-hidden relative selection:bg-none flex items-center justify-center p-6 md:p-8">
+        <div className="min-h-screen bg-[#050505] text-white font-sans overflow-hidden relative selection:bg-none flex flex-col items-center justify-center p-6 md:p-8">
             
-            {/* AMBIENTE DE LUZ (FUNDO) */}
+            {/* Background Effects */}
             <div className="fixed inset-0 z-0 pointer-events-none">
                 <div className="absolute top-[-20%] left-[-20%] w-[800px] h-[800px] bg-orange-600/10 rounded-full blur-[120px] animate-float-slow"></div>
                 <div className="absolute bottom-[-20%] right-[-20%] w-[600px] h-[600px] bg-yellow-500/5 rounded-full blur-[100px] animate-float-reverse"></div>
             </div>
 
-            {/* MOLDURA PRINCIPAL */}
             <main className="relative z-10 w-full max-w-[600px] h-[85vh] bg-black/60 backdrop-blur-md rounded-[2.5rem] border-[3px] border-transparent bg-clip-padding flex flex-col shadow-2xl"
                   style={{ borderImage: 'linear-gradient(135deg, #ff4d00, #ffcc00) 1', borderRadius: '2.5rem' }}>
                 
-                {/* --- TELA 1: IDLE (ESPERA) --- */}
                 {viewState === 'idle' && (
                     <div className="flex-1 flex flex-col justify-between p-8 text-center animate-fade-in h-full">
-                        
-                        {/* TOPO: Título */}
                         <div className="mt-8">
-                            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-yellow-400 mb-2 drop-shadow-sm tracking-tight">
-                                OLÁ, PLAYER!
-                            </h1>
-                            <p className="text-lg text-gray-400 font-medium tracking-wide">
-                                Pronto para subir de nível?
-                            </p>
+                            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-yellow-400 mb-2 drop-shadow-sm tracking-tight">OLÁ, PLAYER!</h1>
+                            <p className="text-lg text-gray-400 font-medium tracking-wide">Pronto para subir de nível?</p>
                         </div>
-
-                        {/* MEIO: Logo e Texto "Aguardando" */}
                         <div className="flex flex-col items-center justify-center">
-                            <p className="text-gray-500 text-sm md:text-base mb-6 animate-pulse italic tracking-widest uppercase">
-                                ...aguardando o próximo movimento...
-                            </p>
-                            
-                            {/* SVG ANIMADO DO LOGO */}
+                            <p className="text-gray-500 text-sm md:text-base mb-6 animate-pulse italic tracking-widest uppercase">...aguardando o próximo movimento...</p>
+                            {/* Logo SVG */}
                             <svg className="w-56 h-auto drop-shadow-[0_0_20px_rgba(255,77,0,0.4)]" viewBox="0 0 600 485" xmlns="http://www.w3.org/2000/svg">
                                 <defs>
                                     <linearGradient id="logo-gradient-stroke" x1="0%" y1="100%" x2="0%" y2="0%">
@@ -202,19 +155,18 @@ export default function ScoreboardGame() {
                             </svg>
                         </div>
 
-                        {/* RODAPÉ (Botão de Teste Disfarçado) */}
-                        <div className="mb-8 cursor-pointer" onClick={startVotingSession} title="Simular Checkin (Admin)">
-                            <p className="text-orange-500/60 text-xs font-bold uppercase tracking-widest animate-pulse hover:text-orange-400 transition-colors">
-                                Faça seu checkin e libere o game!
+                        {/* Botão de Teste Manual (Admin) */}
+                        <div className="mb-8 cursor-pointer opacity-0 hover:opacity-100 transition-opacity" onClick={startVotingSession} title="Simular Checkin (Admin)">
+                            <p className="text-orange-500/60 text-xs font-bold uppercase tracking-widest">
+                                Teste Manual
                             </p>
                         </div>
                     </div>
                 )}
 
-                {/* --- TELA 2: VOTING (VOTAÇÃO) --- */}
+                {/* --- VOTING SCREEN --- */}
                 {viewState === 'voting' && (
                     <div className="flex-1 flex flex-col h-full animate-scale-in">
-                        {/* Header */}
                         <div className="pt-10 pb-6 px-8 text-center shrink-0">
                             <h1 className="text-3xl md:text-4xl font-black uppercase text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-yellow-400 leading-tight drop-shadow-md">
                                 {config?.titulo || 'FAÇA SUA ESCOLHA!'}
@@ -224,7 +176,6 @@ export default function ScoreboardGame() {
                             </p>
                         </div>
 
-                        {/* Grid de Opções */}
                         <div className={`flex-1 grid ${gridCols} gap-6 px-8 pb-8 content-center overflow-y-auto custom-scrollbar`}>
                             {config?.opcoes.map((opt, idx) => (
                                 <button
@@ -236,26 +187,21 @@ export default function ScoreboardGame() {
                                         aspectRatio: config.opcoes.length <= 4 ? '4/3' : '3/2' 
                                     }}
                                 >
-                                    {/* Visual Colorido */}
                                     <div className="transform group-hover:scale-110 transition-transform duration-300">
                                         {opt.tipo === 'emoji' && (
                                             <span className="text-6xl md:text-7xl drop-shadow-lg filter-none">{opt.valor}</span>
                                         )}
-                                        
                                         {opt.tipo === 'image' && opt.valor && (
                                             <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden border-2 border-white/10 shadow-lg">
                                                 <img src={`${LOCAL_API_URL}${opt.valor}`} alt={opt.nome} className="w-full h-full object-cover" />
                                             </div>
                                         )}
-
                                         {opt.tipo === 'none' && (
                                             <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center text-white/10">
                                                 <span className="material-symbols-outlined text-3xl">touch_app</span>
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Nome */}
                                     <span className="block text-base md:text-lg font-bold text-gray-200 uppercase leading-tight px-1 group-hover:text-white">
                                         {opt.nome}
                                     </span>
@@ -263,7 +209,6 @@ export default function ScoreboardGame() {
                             ))}
                         </div>
                         
-                        {/* Botão Cancelar */}
                         <div className="pb-6 text-center shrink-0">
                             <button onClick={() => {
                                 clearTimers();
@@ -275,20 +220,13 @@ export default function ScoreboardGame() {
                     </div>
                 )}
 
-                {/* --- TELA 3: SUCCESS (CONFIRMAÇÃO) --- */}
+                {/* --- SUCCESS SCREEN --- */}
                 {viewState === 'success' && (
                     <div className="flex-1 flex flex-col justify-between items-center p-8 text-center animate-fade-in h-full">
-                        
                         <div className="mt-12">
-                            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-yellow-400 mb-2 drop-shadow-sm">
-                                ISSO AÍ!
-                            </h1>
-                            <p className="text-lg text-gray-400 font-medium">
-                                As portas do labirinto se abrirão.
-                            </p>
+                            <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-yellow-400 mb-2 drop-shadow-sm">ISSO AÍ!</h1>
+                            <p className="text-lg text-gray-400 font-medium">As portas do labirinto se abrirão.</p>
                         </div>
-
-                        {/* Logo Estático com Glow */}
                         <div className="flex-1 flex items-center justify-center">
                             <svg className="w-64 h-auto drop-shadow-[0_0_30px_rgba(255,77,0,0.6)]" viewBox="0 0 600 485" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="#FF4D00" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round">
@@ -297,26 +235,20 @@ export default function ScoreboardGame() {
                                 </g>
                             </svg>
                         </div>
-
-                        {/* Bottom: Texto final */}
                         <div className="mb-10 w-full max-w-xs mx-auto">
                             <p className="text-white/60 text-sm uppercase tracking-wide mb-2">Você escolheu:</p>
-                            <p className="text-2xl font-bold text-orange-400 mb-6 drop-shadow-md truncate px-4">
-                                "{votedOption}"
-                            </p>
-                            
-                            {/* Barra de Progresso (Feedback Visual do Timer) */}
+                            <p className="text-2xl font-bold text-orange-400 mb-6 drop-shadow-md truncate px-4">"{votedOption}"</p>
                             <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
                                 <div className="h-full bg-gradient-to-r from-orange-500 to-yellow-500 animate-progress-shrink origin-left w-full"></div>
                             </div>
-                            <p className="text-xl font-bold italic text-white/90 mt-6">
-                                Você está no controle. Boa diversão!
-                            </p>
+                            <p className="text-xl font-bold italic text-white/90 mt-6">Você está no controle. Boa diversão!</p>
                         </div>
                     </div>
                 )}
-
             </main>
+            <div className="mt-6 text-center text-[10px] text-white/20 uppercase tracking-widest font-medium">
+                <p>© Developed by: <span className="text-orange-500 font-bold">Matteus Tirado</span></p>
+            </div>
         </div>
     );
 }

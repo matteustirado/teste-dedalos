@@ -1,30 +1,37 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-export default function Home() {
+// Aceita a prop 'unit' para definir se é SP ou BH (Padrão SP)
+export default function Home({ unit = 'sp' }) {
   const navigate = useNavigate()
   
-  // Estado unificado para as seções
+  // Salva a unidade escolhida no navegador para que a Rádio saiba onde estamos
+  useEffect(() => {
+    localStorage.setItem('dedalos_active_unit', unit);
+  }, [unit]);
+  
   const [expandedSections, setExpandedSections] = useState({ 
     radio: false, 
-    maintenance: false, // Unificado
+    maintenance: false, 
     cx: false 
   })
 
+  // Ferramentas de Rádio
   const radioTools = [
     { id: 'dj-controller', name: 'Painel do DJ', icon: 'album', path: '/radio/dj' },
     { id: 'collection', name: 'Acervo de Músicas', icon: 'music_video', path: '/radio/collection' },
     { id: 'playlist-creator', name: 'Criar Playlists', icon: 'playlist_add', path: '/radio/playlist-creator' },
     { id: 'library', name: 'Biblioteca', icon: 'library_music', path: '/radio/library' },
     { id: 'schedule', name: 'Agendamento', icon: 'calendar_month', path: '/radio/schedule' },
+    { id: 'jukebox', name: 'Jukebox', icon: 'queue_music', path: `/radio/jukebox/${unit}` }, // Link dinâmico
     { id: 'go-live', name: 'Ao Vivo', icon: 'sensors', path: 'EXTERNAL_WATCH' }
   ]
 
-  // Ferramentas de Manutenção Unificadas (Default SP)
+  // Ferramentas de Manutenção
   const maintenanceTools = [
-    { id: 'quinta-premiada', name: 'Quinta Premiada', icon: 'stars', path: '/tools/thursday/sp' },
-    { id: 'tabela-precos', name: 'Tabela de Preços', icon: 'price_change', path: '/tools/prices/sp/view' },
-    { id: 'placar-dedalos', name: 'Placar Dedalos', icon: 'scoreboard', path: '/tools/scoreboard/maintenance/sp' } // Ajustado para Maintenance
+    { id: 'quinta-premiada', name: 'Quinta Premiada', icon: 'stars', path: `/tools/thursday/${unit}` },
+    { id: 'tabela-precos', name: 'Tabela de Preços', icon: 'price_change', path: `/tools/prices/${unit}/view` },
+    { id: 'placar-dedalos', name: 'Placar Dedalos', icon: 'scoreboard', path: `/tools/scoreboard/maintenance/${unit}` }
   ]
 
   const cxTools = [
@@ -44,10 +51,16 @@ export default function Home() {
     }
   }
 
+  // Definição de cores baseados na unidade
+  const isBH = unit === 'bh';
+  const unitLabel = isBH ? 'BELO HORIZONTE' : 'SÃO PAULO';
+  const unitTextColor = isBH ? 'text-yellow-400' : 'text-green-500';
+
   return (
     <div className="min-h-screen bg-gradient-warm">
       <div className="container mx-auto px-4 py-16">
-        {/* HEADER */}
+        
+        {/* HEADER LIMPO (Sem o badge no topo) */}
         <div className="text-center mb-16">
           <div className="flex justify-center mb-8">
             <svg className="w-24 h-24" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -87,17 +100,17 @@ export default function Home() {
             </div>
             
             {expandedSections.radio && (
-              <div className="grid grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/10 animate-fade-in-down">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mt-6 pt-6 border-t border-white/10 animate-fade-in-down">
                 {radioTools.map((tool) => (
                   <div 
                     key={tool.id} 
                     onClick={() => handleToolClick(tool.path)} 
-                    className={`liquid-glass rounded-xl p-6 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group`}
+                    className={`liquid-glass rounded-xl p-4 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group flex flex-col items-center`}
                   >
-                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-red-600 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform`}>
+                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-red-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                       <span className="material-symbols-outlined text-2xl text-white">{tool.icon}</span>
                     </div>
-                    <h3 className="text-base font-bold text-white text-center">{tool.name}</h3>
+                    <h3 className="text-sm font-bold text-white text-center leading-tight">{tool.name}</h3>
                   </div>
                 ))}
               </div>
@@ -108,30 +121,31 @@ export default function Home() {
           <div className="liquid-glass rounded-xl p-6">
             <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('maintenance')}>
               <div className="flex items-center gap-4">
-                {/* Ícone Azul/Cyan mantido */}
                 <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
                   <span className="material-symbols-outlined text-3xl text-white">build_circle</span>
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white">Ferramentas de Manutenção</h2>
-                  <p className="text-text-muted text-sm">Gerenciamento e configurações</p>
+                  <p className="text-text-muted text-sm">
+                    Ferramentas de manutenção para <span className={`uppercase ${unitTextColor} font-bold`}>{unitLabel}</span>
+                  </p>
                 </div>
               </div>
               <span className={`material-symbols-outlined text-white text-3xl transition-transform ${expandedSections.maintenance ? 'rotate-180' : ''}`}>expand_more</span>
             </div>
             
             {expandedSections.maintenance && (
-              <div className="grid grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/10 animate-fade-in-down">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/10 animate-fade-in-down">
                 {maintenanceTools.map((tool) => (
                   <div 
                     key={tool.id} 
                     onClick={() => handleToolClick(tool.path)} 
-                    className={`liquid-glass rounded-xl p-6 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group`}
+                    className={`liquid-glass rounded-xl p-4 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group flex flex-col items-center`}
                   >
-                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform`}>
+                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                       <span className="material-symbols-outlined text-2xl text-white">{tool.icon}</span>
                     </div>
-                    <h3 className="text-base font-bold text-white text-center">{tool.name}</h3>
+                    <h3 className="text-sm font-bold text-white text-center leading-tight">{tool.name}</h3>
                   </div>
                 ))}
               </div>
@@ -154,12 +168,12 @@ export default function Home() {
             </div>
             
             {expandedSections.cx && (
-              <div className="grid grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/10 animate-fade-in-down">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t border-white/10 animate-fade-in-down">
                 {cxTools.map((tool) => (
                   <div 
                     key={tool.id} 
                     onClick={() => handleToolClick(tool.path)} 
-                    className={`liquid-glass rounded-xl p-6 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group`}
+                    className={`liquid-glass rounded-xl p-4 transform transition-all duration-300 hover:shadow-2xl cursor-pointer hover:scale-105 group flex flex-col items-center`}
                   >
                     <div className={`w-12 h-12 rounded-lg bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform`}>
                       <span className="material-symbols-outlined text-2xl text-white">{tool.icon}</span>

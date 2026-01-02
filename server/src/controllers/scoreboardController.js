@@ -1,7 +1,91 @@
 import pool from '../config/db.js';
 import { getIO } from '../socket.js';
 
-// --- CONFIGURAÇÃO ATIVA ---
+// =====================================================================
+// 📡 SENTINELA DE CHECK-INS (Monitoramento Ativo)
+// =====================================================================
+
+const CHECKIN_INTERVAL = 5000; // 5 segundos
+let lastCheckinCount = { SP: null, BH: null };
+
+// Configuração lida do .env do servidor (process.env)
+const SENTINELA_CONFIG = {
+    SP: {
+        url: process.env.VITE_API_URL_SP,
+        token: process.env.VITE_API_TOKEN_SP
+    },
+    BH: {
+        url: process.env.VITE_API_URL_BH,
+        token: process.env.VITE_API_TOKEN_BH
+    }
+};
+
+const iniciarSentinela = () => {
+    console.log("📡 Sentinela de Check-ins iniciado...");
+
+    setInterval(async () => {
+        const unidades = ['SP', 'BH'];
+
+        for (const unidade of unidades) {
+            const config = SENTINELA_CONFIG[unidade];
+            // Se não tiver config no env, pula
+            if (!config || !config.url || !config.token) continue;
+
+            try {
+                // Formata data YYYY-MM-DD
+                const dataHoje = new Date().toISOString().split('T')[0];
+                
+                // Garante URL limpa e monta endpoint
+                const baseUrl = config.url.replace(/\/$/, "");
+                const endpoint = `${baseUrl}/api/entradasPorData/${dataHoje}`;
+
+                // Faz a requisição para a API externa
+                const response = await fetch(endpoint, {
+                    headers: { "Authorization": `Token ${config.token}` }
+                });
+
+                if (response.ok) {
+                    const dados = await response.json();
+                    // API Dedalos retorna array ou objeto com results
+                    const listaEntradas = Array.isArray(dados) ? dados : (dados.results || []);
+                    const totalAtual = listaEntradas.length;
+
+                    // 1. Primeira execução: Apenas define a linha de base
+                    if (lastCheckinCount[unidade] === null) {
+                        lastCheckinCount[unidade] = totalAtual;
+                        continue;
+                    }
+
+                    // 2. Detectou aumento (Novo Check-in!)
+                    if (totalAtual > lastCheckinCount[unidade]) {
+                        console.log(`🚨 [Sentinela] NOVO CHECK-IN DETECTADO EM ${unidade}! (${lastCheckinCount[unidade]} -> ${totalAtual})`);
+                        
+                        const io = getIO();
+                        
+                        // DISPARA EVENTO PARA O FRONTEND (GAME/DISPLAY)
+                        io.emit('checkin:novo', { 
+                            unidade: unidade, // 'SP' ou 'BH'
+                            total: totalAtual,
+                            timestamp: new Date()
+                        });
+
+                        lastCheckinCount[unidade] = totalAtual;
+                    }
+                }
+            } catch (error) {
+                // Erros silenciosos de rede para não spamar o log
+            }
+        }
+    }, CHECKIN_INTERVAL);
+};
+
+// Inicia o loop assim que o arquivo é carregado
+iniciarSentinela();
+
+
+// =====================================================================
+// 🎮 CONTROLLERS DO SCOREBOARD (MANTIDOS IGUAIS)
+// =====================================================================
 
 export const getActiveConfig = async (req, res) => {
     const { unidade } = req.params;
@@ -9,7 +93,6 @@ export const getActiveConfig = async (req, res) => {
         const [rows] = await pool.query('SELECT * FROM scoreboard_active WHERE unidade = ?', [unidade.toUpperCase()]);
         if (rows.length === 0) return res.status(404).json({ error: 'Configuração não encontrada.' });
         
-        // Parse do JSON de opções se vier como string
         const config = rows[0];
         if (typeof config.opcoes === 'string') config.opcoes = JSON.parse(config.opcoes);
         
@@ -23,12 +106,15 @@ export const getActiveConfig = async (req, res) => {
 export const updateActiveConfig = async (req, res) => {
     const { unidade, titulo, layout, opcoes, status } = req.body;
     
-    // Validação básica
     if (!unidade || !titulo || !opcoes) {
         return res.status(400).json({ error: "Dados incompletos." });
     }
 
+    const connection = await pool.getConnection();
+
     try {
+        await connection.beginTransaction();
+
         const opcoesString = JSON.stringify(opcoes);
         const unidadeUpper = unidade.toUpperCase();
 
@@ -42,38 +128,38 @@ export const updateActiveConfig = async (req, res) => {
             status = VALUES(status)
         `;
 
-        await pool.query(sql, [unidadeUpper, titulo, layout, opcoesString, status]);
+        await connection.query(sql, [unidadeUpper, titulo, layout, opcoesString, status]);
+        await connection.query('DELETE FROM scoreboard_votes WHERE unidade = ?', [unidadeUpper]);
+        await connection.commit();
 
-        // Ao mudar a configuração, resetamos os votos antigos para não misturar dados?
-        // Por segurança, vamos apenas notificar. O Admin pode clicar em "Zerar Votos" separadamente se quiser.
-        
-        // Notifica via Socket que a configuração mudou (Telas atualizam sozinhas)
         const io = getIO();
         io.emit('scoreboard:config_updated', { unidade: unidadeUpper });
+        io.emit('scoreboard:vote_updated', { unidade: unidadeUpper, votes: [] });
 
-        res.json({ message: "Placar atualizado com sucesso!" });
+        console.log(`[Scoreboard] Configuração atualizada e votos zerados para ${unidadeUpper}`);
+        res.json({ message: "Placar atualizado e votos reiniciados com sucesso!" });
+
     } catch (err) {
+        await connection.rollback();
         console.error("Erro ao atualizar placar:", err);
         res.status(500).json({ error: err.message });
+    } finally {
+        connection.release();
     }
 };
 
-// --- VOTOS ---
-
 export const castVote = async (req, res) => {
     const { unidade, optionIndex } = req.body;
+    const idx = optionIndex !== undefined ? optionIndex : null;
 
-    if (!unidade || optionIndex === undefined) {
+    if (!unidade || idx === null) {
         return res.status(400).json({ error: "Dados de voto inválidos." });
     }
 
     try {
-        await pool.query('INSERT INTO scoreboard_votes (unidade, option_index) VALUES (?, ?)', [unidade.toUpperCase(), optionIndex]);
+        await pool.query('INSERT INTO scoreboard_votes (unidade, option_index) VALUES (?, ?)', [unidade.toUpperCase(), idx]);
         
-        // Emite atualização em tempo real para o Placar (TV)
         const io = getIO();
-        
-        // Para otimizar, podíamos mandar só o novo voto, mas mandar o total garante consistência
         const [rows] = await pool.query(
             'SELECT option_index, COUNT(*) as count FROM scoreboard_votes WHERE unidade = ? GROUP BY option_index', 
             [unidade.toUpperCase()]
@@ -105,17 +191,13 @@ export const resetVotes = async (req, res) => {
     const { unidade } = req.body;
     try {
         await pool.query('DELETE FROM scoreboard_votes WHERE unidade = ?', [unidade.toUpperCase()]);
-        
         const io = getIO();
         io.emit('scoreboard:vote_updated', { unidade: unidade.toUpperCase(), votes: [] });
-        
         res.json({ message: "Votos zerados." });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
-
-// --- PRESETS (PREDEFINIÇÕES) ---
 
 export const savePreset = async (req, res) => {
     const { titulo_preset, titulo_placar, layout, opcoes } = req.body;
