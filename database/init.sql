@@ -1,7 +1,10 @@
 USE radio_dedalos;
 
--- 1. LIMPEZA TOTAL (Para garantir que recrie do zero sem erros)
+-- 1. LIMPEZA TOTAL
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS scoreboard_votes;
+DROP TABLE IF EXISTS scoreboard_presets;
+DROP TABLE IF EXISTS scoreboard_active;
 DROP TABLE IF EXISTS historico_promocoes;
 DROP TABLE IF EXISTS jukebox_pedidos;
 DROP TABLE IF EXISTS agendamentos;
@@ -76,18 +79,52 @@ CREATE TABLE radio_config (
   config_value JSON NOT NULL
 );
 
--- [NOVO] TABELA DE HISTÓRICO DE PROMOÇÕES (Quinta Premiada, etc)
 CREATE TABLE historico_promocoes (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  tipo VARCHAR(50) NOT NULL, -- ex: 'QUINTA_PREMIADA'
-  unidade VARCHAR(10) NOT NULL, -- 'SP' ou 'BH'
+  tipo VARCHAR(50) NOT NULL, 
+  unidade VARCHAR(10) NOT NULL, 
   data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   total_sorteados INT,
   total_resgatados INT,
-  detalhes JSON, -- Armazena o array do sorteio como JSON
+  detalhes JSON, 
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- [NOVO] TABELAS DO PLACAR (SCOREBOARD)
+
+-- Armazena a configuração ATUAL rodando nas telas
+CREATE TABLE scoreboard_active (
+  unidade VARCHAR(10) NOT NULL PRIMARY KEY, -- 'SP' ou 'BH'
+  titulo VARCHAR(255) NOT NULL,
+  layout ENUM('landscape', 'portrait') NOT NULL DEFAULT 'landscape',
+  opcoes JSON NOT NULL, -- Array de objetos: [{nome, tipo, valor(emoji/img)}, ...]
+  status ENUM('ATIVO', 'PAUSADO') NOT NULL DEFAULT 'ATIVO',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Armazena configurações salvas para uso posterior
+CREATE TABLE scoreboard_presets (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  titulo_preset VARCHAR(100) NOT NULL,
+  titulo_placar VARCHAR(255) NOT NULL,
+  layout ENUM('landscape', 'portrait') NOT NULL DEFAULT 'landscape',
+  opcoes JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Armazena os votos individuais
+CREATE TABLE scoreboard_votes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  unidade VARCHAR(10) NOT NULL,
+  option_index INT NOT NULL, -- Qual opção recebeu o voto (0, 1, 2...)
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. DADOS INICIAIS
 INSERT INTO radio_config (config_key, config_value) VALUES ('commercial_track_ids', '[]');
 INSERT INTO radio_config (config_key, config_value) VALUES ('fallback_playlist_ids', '{"DOMINGO": 1, "SEGUNDA": 1, "TERCA": 1, "QUARTA": 1, "QUINTA": 1, "SEXTA": 1, "SABADO": 1}');
+
+-- Configuração inicial do Placar para não dar erro na primeira carga
+INSERT INTO scoreboard_active (unidade, titulo, layout, opcoes, status) VALUES 
+('SP', 'Aguardando Configuração', 'landscape', '[{"nome":"Opção 1","tipo":"emoji","valor":"⏳"},{"nome":"Opção 2","tipo":"emoji","valor":"🔧"}]', 'PAUSADO'),
+('BH', 'Aguardando Configuração', 'landscape', '[{"nome":"Opção 1","tipo":"emoji","valor":"⏳"},{"nome":"Opção 2","tipo":"emoji","valor":"🔧"}]', 'PAUSADO');

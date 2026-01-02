@@ -245,3 +245,65 @@
     max-width: 100%;
     overflow: hidden;
 }
+
+/* =========================================
+   REMOÇÃO DE SETAS EM INPUTS NUMÉRICOS
+   ========================================= */
+
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Animações do Game */
+@keyframes scale-in-elastic {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.animate-scale-in-elastic {
+  animation: scale-in-elastic 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes progress-shrink {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+.animate-progress-shrink {
+  animation: progress-shrink 3s linear forwards;
+}
+
+/* Animação do Logo Dedalos */
+@keyframes draw-logo-final {
+    0% { stroke-dashoffset: 5000; }
+    50% { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: -5000; }
+}
+
+.animate-draw-logo {
+    stroke-dasharray: 5000;
+    stroke-dashoffset: 5000;
+    animation: draw-logo-final 4s ease-in-out infinite;
+}
+
+@keyframes float-slow {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-20px) scale(1.05); }
+}
+
+.animate-float-slow {
+    animation: float-slow 10s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+    animation: float-slow 15s ease-in-out infinite reverse;
+}

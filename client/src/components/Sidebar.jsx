@@ -21,10 +21,11 @@ export default function Sidebar({
     radio: [
       { id: 'home', label: 'Home', icon: 'home', path: '/' },
       { id: 'dj', label: 'Painel do DJ', icon: 'album', path: '/radio/dj' },
-      { id: 'collection', label: 'Acervo de Músicas', icon: 'music_video', path: '/radio/collection' },
+      { id: 'collection', label: 'Acervo', icon: 'music_video', path: '/radio/collection' }, // Texto encurtado
       { id: 'playlist-creator', label: 'Criar Playlist', icon: 'playlist_add', path: '/radio/playlist-creator' },
       { id: 'library', label: 'Biblioteca', icon: 'library_music', path: '/radio/library' },
       { id: 'schedule', label: 'Agendamento', icon: 'calendar_month', path: '/radio/schedule' },
+      { id: 'jukebox', label: 'Jukebox', icon: 'queue_music', path: '/radio/jukebox/sp' }, // Nova opção
     ],
     // Menu de Manutenção - AJUSTADO
     maintenance: [

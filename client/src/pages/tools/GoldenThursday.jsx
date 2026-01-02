@@ -44,7 +44,7 @@ export default function GoldenThursday() {
     // --- ESTADOS ---
     const [history, setHistory] = useState([]);
     
-    // Estado do Sorteio Atual (Persistido localmente para segurança contra refresh)
+    // Estado do Sorteio Atual (Persistido localmente)
     const [currentDraw, setCurrentDraw] = useState(() => {
         try {
             const saved = localStorage.getItem(`dedalos_thursday_draw_${currentUnit}`);
@@ -60,8 +60,11 @@ export default function GoldenThursday() {
     
     // Controles de Modais
     const [selectedLockerForPrize, setSelectedLockerForPrize] = useState(null); 
-    const [showFinalizeModal, setShowFinalizeModal] = useState(false); // NOVO: Controle do Modal de Finalização
-    const [isFinalizing, setIsFinalizing] = useState(false); // Loading state
+    const [showFinalizeModal, setShowFinalizeModal] = useState(false);
+    const [isFinalizing, setIsFinalizing] = useState(false);
+    
+    // NOVO: Controle do Modal de Resgatados
+    const [showRedeemedModal, setShowRedeemedModal] = useState(false);
 
     // --- CARREGAR HISTÓRICO ---
     const loadHistory = async () => {
@@ -196,10 +199,10 @@ export default function GoldenThursday() {
         return () => clearInterval(interval);
     }, [isMonitoring, config.apiUrl, config.token]); 
 
-    // --- FINALIZAÇÃO (ATUALIZADA) ---
+    // --- FINALIZAÇÃO ---
     const handleRequestFinalize = () => {
         if (!currentDraw) return;
-        setShowFinalizeModal(true); // Abre o modal personalizado
+        setShowFinalizeModal(true);
     };
 
     const confirmFinalize = async () => {
@@ -208,27 +211,24 @@ export default function GoldenThursday() {
         
         const payload = {
             tipo: 'QUINTA_PREMIADA',
-            unidade: currentUnit.toUpperCase(), // Garante 'SP' ou 'BH'
+            unidade: currentUnit.toUpperCase(),
             total_sorteados: currentDraw.length,
             total_resgatados: redeemedCount,
             detalhes: currentDraw
         };
 
         try {
-            // Tenta salvar no banco
             await axios.post(`${API_URL}/api/tools/history`, payload);
             toast.success("Promoção finalizada e salva no histórico!");
         } catch (error) {
             console.error("Erro ao salvar:", error);
-            // Avisa erro mas finaliza localmente
             toast.warning("Finalizado localmente. Falha ao salvar no histórico do servidor.");
         } finally {
-            // LIMPA A TELA INDEPENDENTE DO RESULTADO DO SERVIDOR
             setCurrentDraw(null);
             setIsMonitoring(false);
             setShowFinalizeModal(false);
             setIsFinalizing(false);
-            loadHistory(); // Atualiza a lista lateral
+            loadHistory();
         }
     };
 
@@ -257,14 +257,57 @@ export default function GoldenThursday() {
         toast.success("Resgate salvo com sucesso!");
     };
 
+    // --- IMPRESSÃO DETALHADA ---
     const handlePrint = () => {
         if (!currentDraw) return;
-        const printWindow = window.open('', '', 'height=600,width=400');
-        printWindow.document.write('<html><head><title>Sorteio Quinta Premiada</title><style>body{font-family:monospace;padding:20px}.item{border-bottom:1px solid #ccc;padding:5px 0}</style></head><body>');
-        printWindow.document.write(`<h2>${config.name}</h2><p>${new Date().toLocaleString()}</p><hr/>`);
-        currentDraw.forEach(item => {
-            printWindow.document.write(`<div class="item">Armário: <strong>${item.locker}</strong> (${item.size})</div>`);
-        });
+        
+        // Filtra apenas os resgatados para o relatório
+        const redeemedItems = currentDraw.filter(i => i.status === 'redeemed');
+
+        const printWindow = window.open('', '', 'height=800,width=900');
+        printWindow.document.write('<html><head><title>Relatório de Resgates - Quinta Premiada</title>');
+        printWindow.document.write('<style>');
+        printWindow.document.write(`
+            body { font-family: 'Courier New', Courier, monospace; padding: 20px; color: #000; }
+            h1 { text-align: center; font-size: 1.5em; margin-bottom: 5px; }
+            h2 { text-align: center; font-size: 1em; margin-top: 0; border-bottom: 2px dashed #000; padding-bottom: 10px; }
+            .summary { text-align: right; margin-bottom: 20px; font-weight: bold; }
+            .item { border-bottom: 1px dashed #ccc; padding: 10px 0; display: flex; flex-direction: column; gap: 4px; page-break-inside: avoid; }
+            .item-header { display: flex; justify-content: space-between; align-items: center; }
+            .locker { font-size: 1.3em; font-weight: bold; }
+            .prize { font-weight: bold; text-transform: uppercase; }
+            .details { font-size: 0.9em; color: #333; margin-left: 10px; border-left: 2px solid #ccc; padding-left: 8px; }
+            .footer { margin-top: 30px; text-align: center; font-size: 0.8em; border-top: 2px dashed #000; padding-top: 10px; }
+        `);
+        printWindow.document.write('</style></head><body>');
+        
+        printWindow.document.write(`<h1>${config.name}</h1>`);
+        printWindow.document.write(`<h2>RELATÓRIO DE PREMIAÇÕES</h2>`);
+        
+        printWindow.document.write(`<div class="summary">`);
+        printWindow.document.write(`DATA: ${new Date().toLocaleString()}<br/>`);
+        printWindow.document.write(`TOTAL RESGATADO: ${redeemedItems.length}`);
+        printWindow.document.write(`</div>`);
+        
+        if (redeemedItems.length === 0) {
+            printWindow.document.write('<p style="text-align:center; margin-top:50px;">Nenhum prêmio foi resgatado neste sorteio.</p>');
+        } else {
+            redeemedItems.forEach(item => {
+                // Formata os detalhes para quebra de linha visual na impressão
+                const formattedDetails = item.details ? item.details.replace(/ \| /g, '<br/>') : 'Sem detalhes adicionais';
+                
+                printWindow.document.write('<div class="item">');
+                printWindow.document.write('<div class="item-header">');
+                printWindow.document.write(`<span class="locker">Armário ${item.locker} <small>(${item.size})</small></span>`);
+                printWindow.document.write(`<span class="prize">${item.prize}</span>`);
+                printWindow.document.write('</div>');
+                printWindow.document.write(`<div class="details">${formattedDetails}</div>`);
+                printWindow.document.write('</div>');
+            });
+        }
+        
+        printWindow.document.write('<div class="footer">DEDALOS BAR - QUINTA PREMIADA</div>');
+        printWindow.document.write('</body></html>');
         printWindow.document.close();
         printWindow.print();
     };
@@ -286,8 +329,29 @@ export default function GoldenThursday() {
                         </div>
                     </div>
                     <div className="flex gap-4">
-                        <button onClick={handlePrint} disabled={!currentDraw} className="bg-white/10 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"><span className="material-symbols-outlined">print</span> IMPRIMIR</button>
-                        <button onClick={handleNewDraw} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-500 transition-colors shadow-lg flex items-center gap-2"><span className="material-symbols-outlined">casino</span> NOVO SORTEIO</button>
+                        <button 
+                            onClick={handlePrint} 
+                            disabled={!currentDraw} 
+                            className="bg-white/10 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            <span className="material-symbols-outlined">print</span> IMPRIMIR
+                        </button>
+                        
+                        {/* NOVO BOTÃO DE RESGATADOS */}
+                        <button 
+                            onClick={() => setShowRedeemedModal(true)} 
+                            disabled={!currentDraw} 
+                            className="bg-purple-600/80 text-white px-6 py-3 rounded-xl font-bold hover:bg-purple-600 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            <span className="material-symbols-outlined">emoji_events</span> RESGATADOS
+                        </button>
+
+                        <button 
+                            onClick={handleNewDraw} 
+                            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-500 transition-colors shadow-lg flex items-center gap-2"
+                        >
+                            <span className="material-symbols-outlined">casino</span> NOVO SORTEIO
+                        </button>
                     </div>
                 </div>
 
@@ -320,7 +384,6 @@ export default function GoldenThursday() {
                                     {currentDraw.map((item) => {
                                         let cardClass = "bg-white/5 border-white/10 text-white hover:bg-white/10"; 
                                         let icon = null;
-                                        // Estilos condicionais
                                         if (item.status === 'occupied') { 
                                             cardClass = "bg-green-600 border-green-400 text-white animate-pulse shadow-[0_0_15px_rgba(34,197,94,0.5)] scale-105"; 
                                             icon = "person"; 
@@ -341,7 +404,6 @@ export default function GoldenThursday() {
                                     })}
                                 </div>
                                 <div className="mt-auto pt-4 border-t border-white/10 flex justify-end">
-                                    {/* USANDO A NOVA FUNÇÃO QUE ABRE O MODAL */}
                                     <button onClick={handleRequestFinalize} className="bg-red-600/80 text-white px-6 py-2 rounded-lg font-bold hover:bg-red-600 transition-colors text-sm flex items-center gap-2"><span className="material-symbols-outlined">stop_circle</span> FINALIZAR PROMOÇÃO</button>
                                 </div>
                             </>
@@ -350,14 +412,58 @@ export default function GoldenThursday() {
                 </div>
             </main>
 
-            {/* MODAL DE RESGATE DE PRÊMIOS */}
+            {/* MODAL DE RESGATE DE PRÊMIOS (INPUT) */}
             {selectedLockerForPrize && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
                     <GiftList lockerNumber={selectedLockerForPrize.locker} onCancel={() => setSelectedLockerForPrize(null)} onConfirm={handleGiftConfirm} />
                 </div>
             )}
 
-            {/* NOVO MODAL DE FINALIZAÇÃO (Substitui window.confirm) */}
+            {/* MODAL LISTA DE RESGATADOS (VISUALIZAÇÃO) */}
+            {showRedeemedModal && currentDraw && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-[#1a1a1a] border border-white/10 rounded-3xl p-6 max-w-3xl w-full shadow-2xl relative flex flex-col max-h-[80vh]">
+                        <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                <span className="bg-purple-600 text-white text-sm px-3 py-1 rounded-full">
+                                    {currentDraw.filter(i => i.status === 'redeemed').length}
+                                </span>
+                                Prêmios Resgatados
+                            </h2>
+                            <button onClick={() => setShowRedeemedModal(false)} className="text-white/50 hover:text-white"><span className="material-symbols-outlined">close</span></button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                            {currentDraw.filter(i => i.status === 'redeemed').length === 0 ? (
+                                <div className="text-center py-10 text-white/30">
+                                    <span className="material-symbols-outlined text-4xl mb-2">inbox</span>
+                                    <p>Nenhum prêmio resgatado ainda.</p>
+                                </div>
+                            ) : (
+                                currentDraw.filter(i => i.status === 'redeemed').map(item => (
+                                    <div key={item.locker} className="bg-white/5 p-4 rounded-xl border border-white/5 flex gap-4 items-center">
+                                        <div className="bg-purple-600/20 text-purple-400 w-16 h-16 rounded-lg flex flex-col items-center justify-center flex-shrink-0 border border-purple-600/30">
+                                            <span className="text-xs font-bold uppercase">Armário</span>
+                                            <span className="text-2xl font-bold">{item.locker}</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-white font-bold text-lg mb-1">{item.prize}</h3>
+                                            <div className="flex flex-col gap-1 text-sm text-text-muted">
+                                                {/* Exibe os detalhes quebrando a string onde tiver | */}
+                                                {item.details && item.details.split(' | ').map((detail, idx) => (
+                                                    <span key={idx} className="block">• {detail.trim()}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL DE FINALIZAÇÃO */}
             {showFinalizeModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
                     <div className="bg-[#1a1a1a] border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl relative text-center">
@@ -371,17 +477,8 @@ export default function GoldenThursday() {
                         </p>
                         
                         <div className="flex gap-4">
-                            <button 
-                                onClick={() => setShowFinalizeModal(false)}
-                                className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl font-bold transition-colors"
-                            >
-                                CANCELAR
-                            </button>
-                            <button 
-                                onClick={confirmFinalize}
-                                disabled={isFinalizing}
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-colors shadow-lg shadow-red-900/30 flex items-center justify-center gap-2"
-                            >
+                            <button onClick={() => setShowFinalizeModal(false)} className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl font-bold transition-colors">CANCELAR</button>
+                            <button onClick={confirmFinalize} disabled={isFinalizing} className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-colors shadow-lg shadow-red-900/30 flex items-center justify-center gap-2">
                                 {isFinalizing ? <span className="material-symbols-outlined animate-spin">refresh</span> : 'FINALIZAR'}
                             </button>
                         </div>

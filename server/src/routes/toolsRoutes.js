@@ -1,12 +1,19 @@
 import express from 'express';
-import { salvarHistorico, listarHistorico } from '../controllers/toolsController.js';
+import { 
+    salvarHistorico, 
+    listarHistorico, 
+    buscarClientePorPulseira // <--- Importante importar a nova função
+} from '../controllers/toolsController.js';
 
 const router = express.Router();
 
-// Rota para salvar (POST)
+// Salvar histórico (Finalizar Promoção)
 router.post('/history', salvarHistorico);
 
-// Rota para ler (GET)
+// Ler histórico
 router.get('/history/:unidade/:tipo', listarHistorico);
+
+// Buscar cliente (Proxy)
+router.get('/client/:pulseira', buscarClientePorPulseira);
 
 export default router;

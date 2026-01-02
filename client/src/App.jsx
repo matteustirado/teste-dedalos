@@ -14,10 +14,12 @@ import Library from './pages/radio/Library';
 import Schedule from './pages/radio/Schedule';
 import WatchVideo from './pages/radio/WatchVideo';
 import Jukebox from './pages/radio/Jukebox';
-import RequestHistory from './pages/radio/RequestHistory'; // Se existir
+import RequestHistory from './pages/radio/RequestHistory';
 
 // Ferramentas de Manutenção
-import GoldenThursday from './pages/tools/GoldenThursday'; // Importação da Quinta Premiada
+import GoldenThursday from './pages/tools/GoldenThursday';
+import ScoreboardEdit from './pages/tools/ScoreboardEdit';
+import ScoreboardGame from './pages/tools/ScoreboardGame'; // <--- IMPORTAÇÃO NOVA
 
 function App() {
   return (
@@ -52,10 +54,16 @@ function App() {
         <Route path="/radio/jukebox/:unidade" element={<Jukebox />} />
 
         {/* Ferramentas de Manutenção */}
+        {/* Quinta Premiada */}
         <Route path="/tools/thursday/:unidade" element={<GoldenThursday />} />
-        
-        {/* Fallback para rota sem unidade, redirecionando ou abrindo padrão (opcional) */}
         <Route path="/tools/thursday" element={<GoldenThursday />} />
+
+        {/* Placar Dedalos (Scoreboard) */}
+        {/* Rota para edição/manutenção do placar */}
+        <Route path="/tools/scoreboard/maintenance/:unidade" element={<ScoreboardEdit />} /> 
+        
+        {/* Rota para o JOGO (Tablet Cliente) */}
+        <Route path="/tools/scoreboard/game/:unidade" element={<ScoreboardGame />} /> 
 
       </Routes>
     </BrowserRouter>
