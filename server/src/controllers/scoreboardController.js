@@ -273,20 +273,42 @@ export const resetVotes = async (req, res) => {
     }
 };
 
+// --- [MODIFICADO] Salvar Preset com Unidade ---
 export const savePreset = async (req, res) => {
-    const { titulo_preset, titulo_placar, layout, opcoes } = req.body;
+    const { unidade, titulo_preset, titulo_placar, layout, opcoes } = req.body;
+    // Garante que a unidade esteja em maiúsculo, padrão SP
+    const unidadeUpper = unidade ? unidade.toUpperCase() : 'SP';
+
     try {
-        await pool.query('INSERT INTO scoreboard_presets (titulo_preset, titulo_placar, layout, opcoes) VALUES (?, ?, ?, ?)', [titulo_preset, titulo_placar, layout, JSON.stringify(opcoes)]);
+        await pool.query(
+            'INSERT INTO scoreboard_presets (unidade, titulo_preset, titulo_placar, layout, opcoes) VALUES (?, ?, ?, ?, ?)',
+            [unidadeUpper, titulo_preset, titulo_placar, layout, JSON.stringify(opcoes)]
+        );
         res.json({ message: "Preset salvo." });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
 };
 
+// --- [MODIFICADO] Buscar Presets filtrados por Unidade ---
 export const getPresets = async (req, res) => {
+    // Recebe a unidade via parâmetro (configurado na rota como /presets/:unidade)
+    const { unidade } = req.params;
+    const unidadeUpper = unidade ? unidade.toUpperCase() : 'SP';
+
     try {
-        const [rows] = await pool.query('SELECT * FROM scoreboard_presets ORDER BY id DESC');
-        const formatted = rows.map(r => ({ ...r, opcoes: (typeof r.opcoes === 'string') ? JSON.parse(r.opcoes) : r.opcoes }));
+        const [rows] = await pool.query(
+            'SELECT * FROM scoreboard_presets WHERE unidade = ? ORDER BY id DESC', 
+            [unidadeUpper]
+        );
+        const formatted = rows.map(r => ({ 
+            ...r, 
+            opcoes: (typeof r.opcoes === 'string') ? JSON.parse(r.opcoes) : r.opcoes 
+        }));
         res.json(formatted);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
 };
 
 export const deletePreset = async (req, res) => {

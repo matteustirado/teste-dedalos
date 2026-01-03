@@ -9,7 +9,7 @@ import {
     getPresets, 
     deletePreset,
     testarTrigger,
-    getCrowdCount // <--- [NOVO] Importando a função do Proxy
+    getCrowdCount 
 } from '../controllers/scoreboardController.js';
 
 const router = express.Router();
@@ -35,7 +35,8 @@ router.get('/votes/:unidade', getVotes);
 router.post('/reset-votes', resetVotes);
 
 // Predefinições (Presets)
-router.get('/presets', getPresets);
+// [MODIFICADO] Adicionado o parâmetro /:unidade para filtrar os presets corretamente
+router.get('/presets/:unidade', getPresets); 
 router.post('/presets', savePreset);
 router.delete('/presets/:id', deletePreset);
 
